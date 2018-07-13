@@ -41,6 +41,7 @@ const RuleOpts = {
         _id: {type: ObjectId}, // auto index
         userName: {type: String, index: true/*||false||'unique'||'hashed'*/}, // 根结点，不用name-hook时，与class名冲突
         desc: {type: String, default: ''},
+        tid: {type: ObjectId},
         banLogin: {type: Boolean},
         banMatch: {type: Boolean, default: true},
         career: {type: Number},

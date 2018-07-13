@@ -178,6 +178,8 @@ class MgrImpl extends EventEmitter{
                             data[k] = {};
                         } else if (rules[k].type == 'array') {
                             data[k] = [];
+                        } else if (rules[k].type == 'ObjectId' || rules[k].type == 'date') {
+                            data[k] = rules[k].default();
                         } else {
                             data[k] = rules[k].default;
                         }

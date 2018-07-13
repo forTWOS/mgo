@@ -30,12 +30,12 @@ try {
 }
 
 //////////////////////////////////
-const logger = ()=>{};//console.log;
+const logger = console.log;
 // setTimeout(()=> { //遍开mongodb.connect时，阻塞导致的连接失败 // todo
 
 // try {
 const UserRule = require('./User');
-
+// logger(UserRule);
 const coc = require('./lib/Mgr').Load(['thcoc', 'user', UserRule]);
 // }catch(e) {
 //     throw e;
@@ -85,6 +85,7 @@ class User {
             cb('Gold_add val err');
             return;
         }
+        console.log(this.__data.tid);
         // this.__data.gold1 += val; //  gold1为非User中定义属性，操作无效
         this.__data.gold += val;
         this.__data.oVal.sVal = 'test';
