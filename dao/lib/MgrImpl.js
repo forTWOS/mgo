@@ -5,7 +5,8 @@
 const logger = require('../../Logger');
 const EventEmitter = require('events').EventEmitter;
 const mongodb = require('mongodb'),
-    ObjectId = mongodb.ObjectId;
+    ObjectId = mongodb.ObjectId,
+    Timestamp = mongodb.Timestamp;
 
 const G_MgrImpl = global.MgrImpl = {};//全局：当前为取_mgr
 
@@ -139,12 +140,15 @@ class MgrImpl extends EventEmitter{
     // data需是对象
     CreateData([dbName, cocName], data) {
         logger.TRACE('[MgrImpl.CreateData] begin.');
-        const dataInstance = this.doCreateData([dbName, cocName], data);
+        const dataInstance = this.doCreateData([dbName, cocName, true], data);
+        if (!dataInstance) {
+            return null;
+        }
         dataInstance.__isCreated = true;
 
         return dataInstance;
     }
-    doCreateData([dbName, cocName], data) {
+    doCreateData([dbName, cocName, isCreated], data) {
         if (undefined === data._id) {
             logger.WARN('[MgrImpl.doCreateData] err: data._id undefined.');
             return null;
@@ -157,6 +161,18 @@ class MgrImpl extends EventEmitter{
             return this.__DataMap[key][id];
         }
 
+        const rules = this.__RuleMap[key].GetRules();
+        if (isCreated) {
+            //数据类型检测
+            const srules = this.__RuleMap[key];
+            for (let k in data) {
+                if (undefined !== rules[k] && !srules.CheckPath(k, data[k])) {
+                    logger.WARN('[MgrImpl.doCreateData] from create data check key('+k+') err.');
+                    data[k] = srules.CheckPathAndReset(rules[k], data[k]);
+                }
+            }
+        }
+
         this.__rDataMap[key][id] = {};
         // logger.TRACE("__rDataMap size:", Object.keys(this.__rDataMap[key]).length);
         this.__DataMap[key][id] = new S_Data([dbName, cocName], id, data._id);//todo:确认多表数据会不会乱
@@ -164,7 +180,6 @@ class MgrImpl extends EventEmitter{
 
         // console.log(data);
         // 第一种使用hook函数，cpu无波动
-        const rules = this.__RuleMap[key].GetRules();
         for (let k in rules) {
             // console.log(k);//name
             Object.defineProperty(dataInstance, k, {
@@ -172,14 +187,18 @@ class MgrImpl extends EventEmitter{
                     // let data = this.__rDataMap[key][id];
                     let data = G_MgrImpl._mgr.__rDataMap[key][id];
                     // console.log(this);
-                    logger.TRACE(k + ' getter');
+                    logger.TRACE('[Data.getter] ' + k);
                     if (undefined === data[k]) {
                         if (rules[k].type == 'object') {
                             data[k] = {};
                         } else if (rules[k].type == 'array') {
                             data[k] = [];
-                        } else if (rules[k].type == 'ObjectId' || rules[k].type == 'date') {
-                            data[k] = rules[k].default();
+                        } else if (rules[k].default instanceof Function) {
+                            if (rules[k].default === Date) {
+                                data[k] = new rules[k].default();
+                            } else {
+                                data[k] =rules[k].default();
+                            }
                         } else {
                             data[k] = rules[k].default;
                         }
@@ -190,7 +209,7 @@ class MgrImpl extends EventEmitter{
                     return data[k];
                 },
                 set: function(v) {
-                    logger.TRACE(k + ' setter: '+v);
+                    logger.TRACE('[Data.setter] '+ k + ': '+v);
                     // let data = this.__rDataMap[key][id];
                     let data = G_MgrImpl._mgr.__rDataMap[key][id];
                     // console.log(this);
@@ -219,6 +238,15 @@ class MgrImpl extends EventEmitter{
                         case 'object': {
                             if (!(v instanceof Object)) {
                                 logger.WARN('[MgrImpl.doCreateData] err: k('+k+') type(must be:object) invalid.');
+                                return;
+                            }
+                            break;
+                        }
+                        case 'date': {
+                            if (typeof v == 'number') {
+                                v = new Date(v);
+                            } else if (!(v instanceof Date)) {
+                                logger.WARN('[MgrImpl.doCreateData] err: k('+k+') type(must be:Date or number) invalid.');
                                 return;
                             }
                             break;
@@ -260,11 +288,16 @@ class MgrImpl extends EventEmitter{
             }
         }
         let defaultsFunc = this.__RuleMap[key].GetDefaultsFunc();
+        logger.TRACE(defaultsFunc);
         if (defaultsFunc) {
             for (let k in defaultsFunc) {
                 if (undefined === data[k]) {
-                    logger.TRACE('[MgrImpl.doCreateData] setDefaultFunc for:' + k + ', '+ defaults[k]);
-                    dataInstance[k] = defaultsFunc[k]();
+                    logger.INFO('[MgrImpl.doCreateData] setDefaultFunc for:' + k);
+                    if (defaultsFunc[k] === Date) {
+                        dataInstance[k] = new defaultsFunc[k]();
+                    } else {
+                        dataInstance[k] = defaultsFunc[k]();
+                    }
                 }
             }
         }

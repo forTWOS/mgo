@@ -2,7 +2,7 @@
  * Created by Linqy on 2018\7\9 0009.
  * 测试nodejs效率
  */
-const limit = 10000000;
+const limit = 1000000;
 
 // 字串拼接
 // 结论: cpu毫无变化,放心使用
@@ -118,8 +118,18 @@ const testObjectTrueOrFalse2 = () => {
     return undefined === o2;
 };
 
+// 测试instanceof效率
+// 10000000*10/秒: cpu0-1-2%
+const testInstance = () => {
+    let ret = testInstance instanceof Function
+};
+
+let d = new Date();
+let d1 = Date();
+console.log(d, d1);
+console.log(typeof d, typeof d1);
 setInterval(() => {
     for (let i = 0; i < limit; ++i) {
-        testObjectTrueOrFalse2();
+        testInstance();
     }
 }, 100);

@@ -61,11 +61,11 @@ const RuleDataTypeStr = [
     'object',
 ];
 const RuleDataDefault = [
-    ObjectId,// ObjectId,
+    ObjectId,// ObjectId,//程序限定，默认值为ObjectId函数
     false,// Boolean,
     0,// Number,
     '',// String,
-    Date.now,// Date,
+    Date,//Date.now,//程序限定，默认值为Date函数
     [],// Array,
     {},// Object,
 ];
@@ -117,25 +117,92 @@ class Rule {
         return this._defaultsFunc;
     }
 
+    // 按规则检测数据，并将异常数据初始化
+    CheckPathAndReset(rule, data) {
+        logger.TRACE('[Rule.CheckPathAndReset] begin.', rule.type, typeof data);
+        let dataType = rule.type;
+        switch (dataType) {
+            case 'string': {
+                if (dataType != typeof data) {
+                    return rule.default;
+                }
+                return data;
+            }
+            case 'number': {
+                if (dataType != typeof data) {
+                    return rule.default;
+                }
+                return data;
+            }
+            case 'boolean': {// true || false
+                if (dataType != typeof data) {
+                    return rule.default;
+                }
+                return data;
+            }
+            case 'date': { // Date || Date.now
+                if (dataType != typeof data) {
+                    if ('number' == typeof data) {
+                        return new Date(data);
+                    }
+                    return new Date();
+                }
+                return data;
+            }
+            case 'ObjectId': {// ObjectId
+                if (!(data instanceof ObjectId)) {
+                    return rule.default();
+                }
+                return data;
+            }
+            case 'array': {
+                if (!(data instanceof Array)) {
+                    return [];
+                }
+                for (let j = 0; j < data.length; ++j) {
+                    if (undefined !== data[j]) {
+                        data[j] = this.CheckPathAndReset(rule.typeExt, data[j]);
+                    }
+                }
+                return data;
+            }
+            case 'object': {
+                for (let k in rule.typeExt) {
+                    if (undefined !== data[k]) {
+                        data[k] = this.CheckPathAndReset(rule.typeExt[k], data[k]);
+                    }
+                }
+                return data;
+            }
+            default: {
+                logger.WARN('[Rule.CheckPathAndReset] should not here.' + dataType);
+                break;
+            }
+        }//switch(tmpData.type)
+
+        return undefined;
+    }
     CheckPath(path, data) {//path是根结点,该结点数据
-        // logger.TRACE('[Rule.CheckPath] begin:'+path, data);
-        if (undefined === this._rules[path] || undefined === data) {
+        logger.TRACE('[Rule.CheckPath] begin:'+path, typeof data);
+        if (undefined === this._rules[path] && undefined !== data) {
             return false;
         }
         let rule = this._rules[path];
-        if (rule.type != 'object' && rule.type == 'array') {
+        logger.TRACE('[Rule.CheckPath] rule.type:', rule.type);
+        if (rule.type != 'object' && rule.type != 'array') {
             return true;
         }
-        for (let k in rule.typeExt) {
-            if (undefined !== data[k] && !this._checkPath(rule.typeExt[k], data[k])) {
-                return false;
-            }
-        }
-        //基础类型，在设置时，即有检测类型
-        return true;
+        return this._checkPath(rule, data);
+        // for (let k in rule.typeExt) {console.log(k, data[k]);
+        //     if (undefined !== data[k] && !this._checkPath(rule.typeExt[k], data[k])) {
+        //         return false;
+        //     }
+        // }
+        // //基础类型，在设置时，即有检测类型
+        // return true;
     }
     _checkPath(rule, data) {
-        // logger.TRACE('[Rule._checkPath] begin.', rule);
+        logger.TRACE('[Rule._checkPath] begin need(' + rule.type + '), data(', typeof data+')');
         let dataType = rule.type;
         switch (dataType) {
             case 'string': {
@@ -167,6 +234,7 @@ class Rule {
             case 'object': {
                 for (let k in rule.typeExt) {
                     if (undefined !== data[k] && !this._checkPath(rule.typeExt[k], data[k])) {
+                        logger.WARN('[Rule._checkPath] failed: '+k+',must('+ rule.typeExt[k].type + '),check failed.');
                         return false;
                     }
                 }
@@ -381,7 +449,7 @@ class Rule {
         if ('_id' == k || (1 === deep && undefined !== data.default)) {
             if (defaultVal instanceof Function) {
                 this._defaultsFunc[k] = defaultVal;
-                this.__defaultsFuncExists = true;
+                this._defaultsFuncExists = true;
             } else {
                 this._defaults[k] = defaultVal;
                 this._defaultsExists = true;
@@ -392,6 +460,7 @@ class Rule {
             default: defaultVal
         };
     }
+    // 将nodejs类型转为字串标识
     static _parseOpts_getTypeStr(dataType) {
         switch (dataType) {
             case String: {
@@ -461,7 +530,7 @@ class Rule {
                     return false;
                 }
                 case Date: { // Date || Date.now
-                    return Date.now;
+                    return Date;
                 }
                 case ObjectId: {// ObjectId
                     return ObjectId;
@@ -504,16 +573,18 @@ class Rule {
                 break;
             }
             case Date: { // Date || Date.now
-                if (!(tmpData.default === Date || tmpData.default === Date.now)) {
-                    throw new Error(errorStr);
-                }
-                break;
+                return Date;
+                // if (!(tmpData.default === Date/* || tmpData.default === Date.now*/)) {
+                //     throw new Error(errorStr);
+                // }
+                // break;
             }
             case ObjectId: {// ObjectId
-                if (tmpData.default !== ObjectId) {
-                    throw new Error(errorStr);
-                }
-                break;
+                return ObjectId;
+                // if (tmpData.default !== ObjectId) {
+                //     throw new Error(errorStr);
+                // }
+                // break;
             }
             default: {
                 if (tmpData.type instanceof Array && 0 !== tmpData.type.length) {

@@ -86,16 +86,16 @@ class Data{
     //    1. gold
     //    2. face.front
     SetChange(path) {
-        // logger.DEBUG('[Data.SetChange]  id('+this.__id+'), begin: ', path);
+        logger.DEBUG('[Data.SetChange]  id('+this.__id+'), begin: ', path);
         let tmp_path = this.parsePath(path);
         let rootKey = tmp_path[0];
-        if (0 == tmp_path.length /*|| '_id' == rootKey */|| 'string' != typeof rootKey/* || undefined === this[rootKey]*/) {//空值或_id(不可变)或非string
+        if (0 == tmp_path.length || '_id' == rootKey || 'string' != typeof rootKey/* || undefined === this[rootKey]*/) {//空值或_id(不可变)或非string
             logger.WARN('[Data.SetChange] err: id('+this.__id+'), path('+path+') invalid.');
             return ErrCode.Data.PathInvalid;
         }
 
         if (!GetRule(this.__key).CheckPath(rootKey, this[rootKey])) {
-            logger.WARN('[Data.SetChange] err: id('+this.__id+'), path('+path+') rule invalid.');
+            logger.WARN('[Data.SetChange] err: id('+this.__id+'), path('+path+') data check failed.');
             return ErrCode.Data.RuleCheckFailed;
         }
         // if (undefined === srules..GetRules()[tmp_path[0]]) {

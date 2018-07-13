@@ -49,6 +49,7 @@ const G_obj = {
             "battle_mode" : 3,
             "match_times" : 4,
             "match_victory" : 3,
+            'testDate': 1531467281000,
             "total_die" : 1,
             "total_fj_dead" : 2,
             "total_soldier_dead" : 60,
@@ -514,6 +515,9 @@ const p = new Promise(function(re, rj) {
 },(err) => {
     logger('create failed');
     logger(err);
+    // process.nextTick(()=>{
+        process.exit();
+    // });
 }).then(function() {
     logger("Gold_add start");
     user.Gold_add(100, (err) => {
@@ -533,7 +537,7 @@ const p = new Promise(function(re, rj) {
 }).catch((err) => {
     logger('catch: ', err);
 });
-// return;
+return;
 
 const ids = [];
 // 100ms/次操作，cpu无耗

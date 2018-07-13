@@ -11,6 +11,7 @@ const ItemsOpts =
         battle_mode: {type: Number}, //战场模式
         match_times: {type: Number}, //累计：总场次
         match_victory: {type: Number}, //累计：胜利场次
+        testDate: {type: Date},
 
         total_die: {type: Number}, //累计：玩家死亡数
         total_fj_dead: {type: Number}, //累计：副将死亡次数

@@ -86,10 +86,13 @@ class User {
             return;
         }
         console.log(this.__data.tid);
+        this.__data.dateValDefaultDate = new Date('2019/07/13 15:29:00');
+        this.__data.dateValDefaultNow = new Date(2020,7,13,15,29,0);
+        console.log(this.__data.tid);
         // this.__data.gold1 += val; //  gold1为非User中定义属性，操作无效
         this.__data.gold += val;
         this.__data.oVal.sVal = 'test';
-        this.__data.oVal.subObj = {};
+        // this.__data.oVal.subObj = {};
         // console.log(this.__data.oVal);
         this.__data.SetChange('oVal');
         // console.log(this.__data.gold);
@@ -105,8 +108,9 @@ class User {
         // this.__data.gold1 += val; //  gold1为非User中定义属性，操作无效
         this.__data.gold += val;
         this.__data.oVal.sVal = 'test';
-        this.__data.oVal.nArray = ['a'];
-        this.__data.oVal.subObj.way = 123;
+        this.__data.oVal.nArray = [321];
+        this.__data.oVal.subObj = {};
+        this.__data.oVal.subObj.way = '123';
         // console.log(this.__data.oVal);
         this.__data.SetChange('oVal');
         // console.log(this.__data.gold);
@@ -147,16 +151,16 @@ class User {
 //     logger('catch: ', err);
 // });
 // return;
-
+console.log(Date.now());
 /// test process: create login gold_add
 const id = ObjectId().toString();
 logger('id:%j', id);
 let user = new User(id);
 const p = new Promise(function(re, rj) {
-    logger('create start');
+    logger('========create start');
     setTimeout(() => {
         user.Create((err) => {
-            logger('create stop');
+            logger('==============create stop');
             if (err) {
                 rj(err);
                 return;
@@ -165,20 +169,20 @@ const p = new Promise(function(re, rj) {
         });
     }, 300);
 }).then(() => {
-    logger('login start');
+    logger('=========login start');
     user.Login((err) => {
-        logger('login stop');
+        logger('==========login stop');
         if (err) {
             return;
         }
     });
 },(err) => {
-    logger('create failed');
+    logger('===============create failed');
     logger(err);
 }).then(function() {
-    logger("Gold_add start");
+    logger("==============Gold_add start");
     user.Gold_add(100, (err) => {
-        logger("Gold_add stop");
+        logger("==============Gold_add stop");
         if (err) {
             return;
         }
@@ -187,9 +191,9 @@ const p = new Promise(function(re, rj) {
 setTimeout(()=>{
 
     p.then(function() {
-    logger("Gold_add start");
+    logger("===========Gold_add2 start");
     user.Gold_add2(100, (err) => {
-        logger("Gold_add stop");
+        logger("==============Gold_add2 stop");
         if (err) {
             return;
         }

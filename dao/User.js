@@ -48,7 +48,7 @@ const RuleOpts = {
         gold: {type: Number, default: 0},
         dateVal: {type: Date},
         dateValDefaultDate: {type: Date, default: Date},
-        dateValDefaultNow: {type: Date, default: Date.now, index:'hashed'},
+        dateValDefaultNow: {type: Date, default: Date, index:'hashed'},
         nArray: {type: [Number]},//数组不设定默认值，程序会默认为[]
         bArray: {type: [Boolean]},
         sArray: {type: [String]},
