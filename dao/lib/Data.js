@@ -89,7 +89,7 @@ class Data{
         logger.DEBUG('[Data.SetChange]  id('+this.__id+'), begin: ', path);
         let tmp_path = this.parsePath(path);
         let rootKey = tmp_path[0];
-        if (0 == tmp_path.length || '_id' == rootKey || 'string' != typeof rootKey/* || undefined === this[rootKey]*/) {//空值或_id(不可变)或非string
+        if (0 == tmp_path.length /*|| '_id' == rootKey*/ || 'string' != typeof rootKey/* || undefined === this[rootKey]*/) {//空值或_id(不可变)或非string
             logger.WARN('[Data.SetChange] err: id('+this.__id+'), path('+path+') invalid.');
             return ErrCode.Data.PathInvalid;
         }

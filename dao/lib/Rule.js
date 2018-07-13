@@ -202,7 +202,7 @@ class Rule {
         // return true;
     }
     _checkPath(rule, data) {
-        logger.TRACE('[Rule._checkPath] begin need(' + rule.type + '), data(', typeof data+')');
+        logger.TRACE('[Rule._checkPath] begin need(' + rule.type + '), data('+ typeof data+')');
         let dataType = rule.type;
         switch (dataType) {
             case 'string': {
@@ -215,7 +215,8 @@ class Rule {
                 return 'boolean' == typeof data;
             }
             case 'date': { // Date || Date.now
-                return 'date' == typeof data;
+                console.log(rule, data, typeof data);
+                return data instanceof Date;
             }
             case 'ObjectId': {// ObjectId
                 return data instanceof ObjectId;

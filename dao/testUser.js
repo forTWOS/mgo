@@ -35,7 +35,7 @@ const logger = console.log;
 
 // try {
 const UserRule = require('./User');
-// logger(UserRule);
+logger(UserRule);
 const coc = require('./lib/Mgr').Load(['thcoc', 'user', UserRule]);
 // }catch(e) {
 //     throw e;
@@ -85,10 +85,9 @@ class User {
             cb('Gold_add val err');
             return;
         }
-        console.log(this.__data.tid);
+        //console.log(this.__data.tid);
         this.__data.dateValDefaultDate = new Date('2019/07/13 15:29:00');
         this.__data.dateValDefaultNow = new Date(2020,7,13,15,29,0);
-        console.log(this.__data.tid);
         // this.__data.gold1 += val; //  gold1为非User中定义属性，操作无效
         this.__data.gold += val;
         this.__data.oVal.sVal = 'test';
@@ -151,7 +150,7 @@ class User {
 //     logger('catch: ', err);
 // });
 // return;
-console.log(Date.now());
+// console.log(Date.now());
 /// test process: create login gold_add
 const id = ObjectId().toString();
 logger('id:%j', id);

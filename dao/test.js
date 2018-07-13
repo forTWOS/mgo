@@ -64,7 +64,8 @@ class User {
                 cb(err);
                 return;
             }
-            this.__data = data;console.log(this.__data);
+            this.__data = data;
+            //console.log(this.__data);
             cb(null);
         });
     }

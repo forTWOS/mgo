@@ -49,7 +49,7 @@ const G_obj = {
             "battle_mode" : 3,
             "match_times" : 4,
             "match_victory" : 3,
-            'testDate': 1531467281000,
+            'testDate': new Date(1531467281000),
             "total_die" : 1,
             "total_fj_dead" : 2,
             "total_soldier_dead" : 60,
@@ -537,7 +537,7 @@ const p = new Promise(function(re, rj) {
 }).catch((err) => {
     logger('catch: ', err);
 });
-return;
+// return;
 
 const ids = [];
 // 100ms/次操作，cpu无耗
@@ -560,7 +560,7 @@ setTimeout(()=>{
         //         // logger('create succ');
         //     });
         // }
-        for (let i = 0; i < 100; ++i) {
+        for (let i = 0; i < 50; ++i) {
             // let tmp = G_objs[i];
             // tmp._id = ObjectId().toString();
             let tmp = JSON.parse(JSON.stringify(G_obj));
@@ -579,13 +579,14 @@ setTimeout(()=>{
     }, 100);
 }, 100);
 
+const limit = 60000;
 setTimeout(()=>{
     setInterval(()=>{
-        if (ids.length <= 90000) {
+        if (ids.length <= limit) {
             return;
         }
 
-        let len = ids.length - 90000;
+        let len = ids.length - limit;
         if (len < 10000) {
             len = 10000;
         }
