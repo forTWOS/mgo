@@ -7,7 +7,7 @@ const mongodb = require('mongodb'),
 
 //////////////////////////////////
 const logger = console.log;
-// setTimeout(()=> { //遍开mongodb.connect时，阻塞导致的连接失败 // todo
+// setTimeout(()=> { //遍开mongodb.connect时，阻塞导致的连接失败
 
 
 

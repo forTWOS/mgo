@@ -87,11 +87,11 @@ class DbCoc {
             cb(null, sdata);
             return;
         }
-        this.One({_id: ObjectId(id)}, cb);// todo:异常事件处理
+        this.One({_id: ObjectId(id)}, cb);
     }
-    Page([page, pageSize], cb) {//todo
-        cb();
-    }
+    // Page([page, pageSize], cb) {
+    //     cb();
+    // }
     // 保存给定的值
     Save(id, sets, cb) {
         logger.TRACE('[DbCoc.Save] begin');
@@ -172,7 +172,7 @@ class DbCoc {
                 if (errCode || sdata.IsChanged() || sdata.IsCreated()) {
                     sdata.Save(); // 重走保存流程
                 } else if (sdata.IsStop()) {//清理流程 有Data.isStop标志
-                    logger.INFO('[DbCoc.doSave] clear Data:', id);// todo:重要处理，打印一下
+                    logger.INFO('[DbCoc.doSave] clear Data:', id);// 重要处理，打印一下
                     G_MgrImpl._mgr.RemoveData(this.__key, id);
                 }
                 if (--cn == 0) {
@@ -445,8 +445,8 @@ class DbCoc {
         });
     }
     ////////////////////////////////////
-    // remove 暂无此操作，不实现了
-    Remove(find, cb) {//todo
-
-    }
+    // // remove 暂无此操作，不实现了
+    // Remove(find, cb) {
+    //
+    // }
 }

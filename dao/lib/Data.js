@@ -42,7 +42,7 @@ class Data{
             return;
         }
         if (!this.IsChanged() && !this.IsCreated() && !this.isSaving()) {
-            logger.DEBUG('[Data.Stop] clear Data:', this.__id);// todo:重要处理，打印一下
+            logger.INFO('[Data.Stop] clear Data:', this.__id);// 重要处理，打印一下
             G_MgrImpl._mgr.RemoveData(this.__key, this.__id);
             return;
         }
@@ -98,9 +98,7 @@ class Data{
             logger.WARN('[Data.SetChange] err: id('+this.__id+'), path('+path+') data check failed.');
             return ErrCode.Data.RuleCheckFailed;
         }
-        // if (undefined === srules..GetRules()[tmp_path[0]]) {
-        //     return '[Data.Set] err: id('+this.__id+'), path('+path+') rule undefined.';
-        // }
+
         this.__changedRoot[rootKey] = 1; // 初始化改为列表
         this.__changedRootExists = true; // 标志：仅为运算方便
         logger.DEBUG('[Data.SetChange] succ: id('+this.__id+'), ', path);
@@ -123,10 +121,6 @@ class Data{
         if (GetCoc(this.__key).HadSaveMsg(this.__id)) {
             return;
         }
-
-        // todo:遍历类型检测
-        let srules = GetRule(this.__key);
-        // console.log(srules.GetRules());
 
         GetCoc(this.__key).AddSaveMsg(this.__id);
     }

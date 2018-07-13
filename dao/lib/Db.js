@@ -155,14 +155,14 @@ class Db extends EventEmitter {
             // logger.TRACE(err);
         };
     }
-    // Add listeners
-    createListener(self, e, object) {//todo
-        return (err) => {
-            if(object.listeners(e).length > 0) {
-                object.emit(e, err, self);
-            }
-        };
-    }
+    // // Add listeners
+    // createListener(self, e, object) {
+    //     return (err) => {
+    //         if(object.listeners(e).length > 0) {
+    //             object.emit(e, err, self);
+    //         }
+    //     };
+    // }
     // _test() {
     //     this._db.collection('config').findOne(function(err, ...data) {
     //         logger.TRACE(err);

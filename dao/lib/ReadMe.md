@@ -13,7 +13,7 @@ Mgr-MgrImpl:
         -Start
         -Error:事件类
         -Stop
-    -Event:事件类 todo
+    -Event:事件类
         -db连接
             -close
             -reconnect

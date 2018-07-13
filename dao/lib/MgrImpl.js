@@ -165,7 +165,7 @@ class MgrImpl extends EventEmitter{
 
         this.__rDataMap[key][id] = {};
         // logger.TRACE("__rDataMap size:", Object.keys(this.__rDataMap[key]).length);
-        this.__DataMap[key][id] = new S_Data([dbName, cocName], id, data._id);//todo:确认多表数据会不会乱
+        this.__DataMap[key][id] = new S_Data([dbName, cocName], id, data._id);
         const dataInstance = this.__DataMap[key][id];
 
         // console.log(data);
@@ -251,11 +251,11 @@ class MgrImpl extends EventEmitter{
                     }
 
                     data[k] = v;
-                    if (k !== '_id') {//些处监听，仅能监测到“根结点数据赋值”,需辅以Data.SetChange函数
+                    // if (k !== '_id') {//些处监听，仅能监测到“根结点数据赋值”,需辅以Data.SetChange函数
                         this.SetChange(k);
                         // this.__changedRoot[k] = 1; // this=> S_Data
                         // this.__changedRootExists = true; // this=> S_Data
-                    }
+                    // }
                 }
             });
             // es5,es6没有对数组进行 getter/setter的解决方案
@@ -333,11 +333,7 @@ class MgrImpl extends EventEmitter{
         this._opts = {};
         this._parseArgsDb(opts.db);
         this._opts.env = opts.env || 'development';
-        if (this._opts.env == 'development') {
-            this._opts.IsDebug = true;
-        } else {
-            this._opts.IsDebug = false;
-        }
+        this._opts.IsDebug = this._opts.env === 'development';
 
         return true;
     }
