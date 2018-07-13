@@ -8,6 +8,7 @@ const S_Rule = require('./lib/Rule');
 
 const signInfoRuleOptsExt = {
     _id: {type: ObjectId},
+    way: {type: String},
 
 };
 const signInfoRuleOpts = {
@@ -58,4 +59,5 @@ const RuleOpts = {
     }
 };
 const UserRule = S_Rule(RuleOpts);
+// console.log(UserRule._rules.oVal.typeExt.subObj);
 module.exports = UserRule;

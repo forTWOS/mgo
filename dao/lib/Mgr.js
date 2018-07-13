@@ -8,7 +8,7 @@
 * 命名，遵守驼峰法
 * 首字母大写，表示对外
 * */
-const logger = console.log;
+const logger = require('../../Logger');
 //singleton
 const MgrImpl = require('./MgrImpl');
 

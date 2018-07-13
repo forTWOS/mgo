@@ -4,8 +4,7 @@
  * 所以：此文件中MgrImpl.Instance，需在MgrImpl完成后，再取值
  */
 const ErrCode = require('./ErrCode');
-// const logger = console.log;
-const logger = ()=>{};
+const logger = require('../../Logger');
 const G_MgrImpl = global.MgrImpl;
 
 const GetCoc = (key) => {
@@ -14,6 +13,8 @@ const GetCoc = (key) => {
 const GetRule = (key) => {
     return G_MgrImpl._mgr.GetRule(key);
 };
+
+const LastErrorTimeLimit = 10000;
 
 class Data{
     constructor([dbName, cocName], id, idObj) {
@@ -27,7 +28,8 @@ class Data{
         this.__changedRootExists = false; // 标志：仅为运算方便
         this.__changedRoot_ing = undefined; //在进行中的改变列表
         this.__isStop = false;//是否进行Data清理<<流程>>，归Data.Stop和DbCoc.Load修改
-        this.__isCreated = false;
+        this.__isCreated = false;//是否为新建数据
+        this.__lastErrorTime = 0;//在db层操作返回错误后，记录时间，用于缓冲一段时间再操作
     }
 
     // 清理真实数据接口
@@ -37,6 +39,11 @@ class Data{
     // ps: 调用此接口后，业务层保存的data需要移除
     Stop() {
         if (this.IsStop()) {// 正常业务，不会触发多次stop；db异常有可能会
+            return;
+        }
+        if (!this.IsChanged() && !this.IsCreated() && !this.isSaving()) {
+            logger.DEBUG('[Data.Stop] clear Data:', this.__id);// todo:重要处理，打印一下
+            G_MgrImpl._mgr.RemoveData(this.__key, this.__id);
             return;
         }
         this.Save();
@@ -49,16 +56,26 @@ class Data{
     SetStop(flag) {
         this.__isStop = flag;
     }
-    isChanged() {
+    IsCreated() {
+        return this.__isCreated;
+    }
+    IsChanged() {
         return this.__changedRootExists;
     }
     isSaving() {
         return undefined !== this.__changedRoot_ing;
     }
+    setLastErrorTime() {
+        this.__lastErrorTime = Date.now() + LastErrorTimeLimit-1000;//时间错开，防止Save处过滤掉该次Save
+        this.__lastErrorT = setTimeout(() => {
+            this.Save();
+            this.__lastErrorT = undefined;
+        }, LastErrorTimeLimit);
+    }
 
     // 清理标志
     clearChangedRoot() {
-        this.__isCreated = false;
+        // this.__isCreated = false;
         this.__changedRoot = {};
         this.__changedRootExists = false;
     }
@@ -69,27 +86,37 @@ class Data{
     //    1. gold
     //    2. face.front
     SetChange(path) {
-        logger('[Data.SetChange] begin: '+path);
+        // logger.DEBUG('[Data.SetChange]  id('+this.__id+'), begin: ', path);
         let tmp_path = this.parsePath(path);
-        if (0 == tmp_path.length || '_id' == tmp_path[0] || 'string' != typeof tmp_path[0]) {//空值或_id(不可变)或非string
-            return '[Data.Set] err: path('+path+') invalid.';
+        let rootKey = tmp_path[0];
+        if (0 == tmp_path.length /*|| '_id' == rootKey */|| 'string' != typeof rootKey/* || undefined === this[rootKey]*/) {//空值或_id(不可变)或非string
+            logger.WARN('[Data.SetChange] err: id('+this.__id+'), path('+path+') invalid.');
+            return ErrCode.Data.PathInvalid;
         }
-        let rules = GetRule(this.__key).GetRules();
-        if (undefined === rules[tmp_path[0]]) {
-            return '[Data.Set] err: path('+path+') rule undefined.';
+
+        if (!GetRule(this.__key).CheckPath(rootKey, this[rootKey])) {
+            logger.WARN('[Data.SetChange] err: id('+this.__id+'), path('+path+') rule invalid.');
+            return ErrCode.Data.RuleCheckFailed;
         }
-        this.__changedRoot[tmp_path[0]] = 1; // 初始化改为列表
+        // if (undefined === srules..GetRules()[tmp_path[0]]) {
+        //     return '[Data.Set] err: id('+this.__id+'), path('+path+') rule undefined.';
+        // }
+        this.__changedRoot[rootKey] = 1; // 初始化改为列表
         this.__changedRootExists = true; // 标志：仅为运算方便
-        logger('[Data.SetChange] succ: '+path);
+        logger.DEBUG('[Data.SetChange] succ: id('+this.__id+'), ', path);
+        return ErrCode.Ok;
     }
     // 因为是消息处理，不使用cb等待
     // 下层保证数据不丢失(事件方案)
     Save() {
-        logger('[Data.Save] begin');
+        logger.DEBUG('[Data.Save] begin', this.__id);
+        if (this.__lastErrorTime > Date.now()) {//错误后10秒内，不进行操作
+            return;
+        }
         //无改变则不处理
         //操作正在进行中,等操作结束，进行触发
-        if (!this.isChanged() || this.isSaving()) {
-            logger('[Data.Save] !isChanged || isSaving', !this.isChanged(), this.isSaving());
+        if ((!this.IsChanged() && !this.IsCreated()) || this.isSaving()) {
+            logger.DEBUG('[Data.Save] id, !IsChanged || isSaving || !IsCreated', this.__id, !this.IsChanged(), this.isSaving(), !this.IsCreated());
             return;
         }
 
@@ -98,20 +125,22 @@ class Data{
         }
 
         // todo:遍历类型检测
-        let rules = GetRule(this.__key);
-        // console.log(rules.GetRules());
+        let srules = GetRule(this.__key);
+        // console.log(srules.GetRules());
 
         GetCoc(this.__key).AddSaveMsg(this.__id);
     }
     DoSave(cb) {
-        if (this.__isCreated) {
+        logger.TRACE('[Data.DoSave] begin.');
+        if (this.IsCreated()) {
+            this.__isCreated = false;
             this.clearChangedRoot();
             this.doCreate(cb);
             return;
         }
 
-        if (!this.isChanged()) {
-            logger('[Data.Save] key('+this.__key+'.'+this.__id+') data empty.');
+        if (!this.IsChanged()) {
+            logger.WARN('[Data.Save] key('+this.__key+'.'+this.__id+') data empty.');
             if (undefined !== cb) {
                 cb(ErrCode.Ok);
             }
@@ -121,7 +150,7 @@ class Data{
         //取真实数据
         let data = G_MgrImpl._mgr.GetRData(this.__key, this.__id);
         if (undefined === data) {
-            logger('[Data.Save] key('+this.__key+'.'+this.__id+') data undefined.');
+            logger.ERROR('[Data.Save] key('+this.__key+'.'+this.__id+') data undefined.');
             if (undefined !== cb) {
                 cb(ErrCode.Data.DataNotExists);
             }
@@ -132,23 +161,25 @@ class Data{
         let sets = {};
         for (let k in this.__changedRoot) {
             if (undefined === data[k]) {
-                logger('[Data.Save] key('+k+') is undefined.');
+                logger.TRACE('[Data.Save] key('+k+') is undefined.');
                 continue;
             }
             sets[k] = data[k];
         }
         // 备份当前保存root点
         this.__changedRoot_ing = this.__changedRoot;
+        logger.TRACE('[Data.DoSave] ', this.__changedRoot_ing);
 
         // 清理标志
         this.clearChangedRoot();
 
         GetCoc(this.__key).Save(this.__idObj, sets, (err) => {
-            logger('[Data.Save] :', err);
+            logger.DEBUG('[Data.DoSave] result:', this.__id, err);
             if (err) { // 存储失败，将改root还给__changeRoot
                 for (let k in this.__changedRoot_ing) {
                     this.__changedRoot[k] = this.__changedRoot_ing[k];
                 }
+                this.setLastErrorTime();
             }
             this.__changedRoot_ing = undefined;
             if (undefined !== cb) {
@@ -158,18 +189,27 @@ class Data{
     }
     SaveForce(cb) { //强制保存所有数据
         GetCoc(this.__key).SaveForce(this.__idObj, (err) => {
-            logger('[SaveForce.Save] :', err);
+            logger.DEBUG('[Data.SaveForce] :', this.__id, err);
+            if (err) {
+                this.setLastErrorTime();
+            }
             if (undefined !== cb) {
                 cb(err ? ErrCode.Data.SaveError: ErrCode.Ok, err);
             }
         });
     }
     doCreate(cb) { //强制保存所有数据
+        logger.TRACE('[Data.doCreate] begin.');
+        this.__changedRoot_ing = true;
         GetCoc(this.__key).doCreate(this.__idObj, (err) => {
-            logger('[SaveForce.Save] :', err);
+            logger.DEBUG('[Data.doCreate] result :', this.__id, err);
             if (err) { // 存储失败，将改root还给__changeRoot
                 this.__isCreated = true;
+                this.setLastErrorTime();
+            } else {
+                this.__isCreated = false;
             }
+            this.__changedRoot_ing = undefined;
             if (undefined !== cb) {
                 cb(err ? ErrCode.Data.SaveError: ErrCode.Ok, err);
             }

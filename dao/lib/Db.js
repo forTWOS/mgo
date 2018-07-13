@@ -2,7 +2,8 @@
  * Created by Linqy on 2018\6\28 0027.
  * db连接封装,1个数据库db==1个Db
  */
-const logger = console.log;
+const logger = require('../../Logger');
+
 const EventEmitter = require('events').EventEmitter;
 const mongodb = require('mongodb'),
     MongoClient = mongodb.MongoClient;
@@ -14,6 +15,7 @@ const Db_status = {
     'Close': 4,
     'Stopped': 5
 };
+const G_MgrImpl = global.MgrImpl;
 
 const DbOpts = {
     poolSize: 10,
@@ -23,7 +25,7 @@ const DbOpts = {
     reconnectTries: 100000000, // 重试次数,30default
     reconnectInterval: 10*1000, // 重连间隔10秒
 };
-const DbFirstReconnectTries = 3;
+const DbFirstReconnectTries = 5;
 //DbOpts.authSource = 'admin';
 DbOpts.ignoreUndefined = true; //Specify if the BSON serializer should ignore undefined fields.
 //DbOpts.auth = {authMechanism: 'MONGODB-CR'};
@@ -38,7 +40,7 @@ class Db extends EventEmitter {
     constructor(dbName, mgr) {
         super();
         this.__dbName = dbName;
-        this._opts = mgr._opts;
+        this._opts = mgr._opts;//因是初始化调用，G_MgrImpl在此处为{},不可使用
         this._dbOpts = JSON.parse(JSON.stringify(DbOpts));//复制DbOpts
         // 设定连接参数
         if (undefined !== this._opts._connOpts) {
@@ -81,14 +83,18 @@ class Db extends EventEmitter {
         if (undefined === count) {
             count = 0;
         } else {
-            logger('[Db.reconnect] count:'+count);
+            logger.INFO('[Db.reconnect] count:'+count);
         }
         MongoClient.connect(this._connStr, this._dbOpts, (err, db) => {
             if (err != null) {
                 if (count === DbFirstReconnectTries) {
+                    process.nextTick(()=>{//不可放throw后，会不执行
+                        logger.ERROR('[Db.reconnect] error: process.exit.');
+                        process.exit();
+                    });
                     throw new Error("connect mongodb error:" + err.toString());
                 } else {
-                    logger('[Db.reconnect] connect('+count+' mongodb error:' + err.toString());
+                    logger.ERROR('[Db.reconnect] connect('+count+' mongodb error:' + err.toString());
                     this.reconnect(count+1);
                     return;
                 }
@@ -97,7 +103,8 @@ class Db extends EventEmitter {
             this._db = db;
             this._dbHandler();
             this._status = Db_status.Connted;
-            logger('connected success.');
+            logger.INFO('connected success.');
+            G_MgrImpl._mgr.emit('connect');
             // this._test();
         });
     }
@@ -134,7 +141,7 @@ class Db extends EventEmitter {
                 }
                 case 'reconnect': {
                     this._status = Db_status.Connted;
-                    // logger(err._privProp, this._db._privProp);// err此处err是db连接实例
+                    // logger.TRACE(err._privProp, this._db._privProp);// err此处err是db连接实例
                     // this._test();
                     break;
                 }
@@ -143,8 +150,9 @@ class Db extends EventEmitter {
                     break;
                 }
             }
-            logger(this._status, eventStr);
-            // logger(err);
+            logger.WARN('[Db._onEvent] ', this._status, eventStr);
+            G_MgrImpl._mgr.emit(eventStr);//setTimeout(()=>{}, 2000);
+            // logger.TRACE(err);
         };
     }
     // Add listeners
@@ -157,8 +165,8 @@ class Db extends EventEmitter {
     }
     // _test() {
     //     this._db.collection('config').findOne(function(err, ...data) {
-    //         logger(err);
-    //         logger(...data);
+    //         logger.TRACE(err);
+    //         logger.TRACE(...data);
     //     });
     // }
 }

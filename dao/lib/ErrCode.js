@@ -15,5 +15,7 @@ module.exports = {
         Saving: 201,
         DataNotExists:202,
         SaveError: 203,
+        RuleCheckFailed: 204,
+        PathInvalid: 205,
     }
 };

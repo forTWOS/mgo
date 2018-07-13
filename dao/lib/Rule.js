@@ -5,7 +5,7 @@
 
 const mongodb = require('mongodb'),
     ObjectId = mongodb.ObjectId;
-const logger = console.log
+const logger = require('../../Logger');
 
 /*
 * {
@@ -117,6 +117,70 @@ class Rule {
         return this._defaultsFunc;
     }
 
+    CheckPath(path, data) {//path是根结点,该结点数据
+        // logger.TRACE('[Rule.CheckPath] begin:'+path, data);
+        if (undefined === this._rules[path] || undefined === data) {
+            return false;
+        }
+        let rule = this._rules[path];
+        if (rule.type != 'object' && rule.type == 'array') {
+            return true;
+        }
+        for (let k in rule.typeExt) {
+            if (undefined !== data[k] && !this._checkPath(rule.typeExt[k], data[k])) {
+                return false;
+            }
+        }
+        //基础类型，在设置时，即有检测类型
+        return true;
+    }
+    _checkPath(rule, data) {
+        // logger.TRACE('[Rule._checkPath] begin.', rule);
+        let dataType = rule.type;
+        switch (dataType) {
+            case 'string': {
+                return 'string' == typeof data;
+            }
+            case 'number': {
+                return 'number' == typeof data;
+            }
+            case 'boolean': {// true || false
+                return 'boolean' == typeof data;
+            }
+            case 'date': { // Date || Date.now
+                return 'date' == typeof data;
+            }
+            case 'ObjectId': {// ObjectId
+                return data instanceof ObjectId;
+            }
+            case 'array': {
+                if (!(data instanceof Array)) {
+                    return false;
+                }
+                for (let j = 0; j < data.length; ++j) {
+                    if (undefined !== data[j] && !this._checkPath(rule.typeExt, data[j])) {
+                        return false;
+                    }
+                }
+                break;
+            }
+            case 'object': {
+                for (let k in rule.typeExt) {
+                    if (undefined !== data[k] && !this._checkPath(rule.typeExt[k], data[k])) {
+                        return false;
+                    }
+                }
+                break;
+            }
+            default: {
+                logger.WARN('[Rule._checkPath] should not here.');
+                break;
+            }
+        }//switch(tmpData.type)
+
+        return true;
+    }
+
     parseOpts(opts) {
         if (undefined !== opts.tableName && 'string' === typeof opts.tableName) {
             this._tableName = opts.tableName;
@@ -221,7 +285,7 @@ class Rule {
         }
     }
 
-    // 遍历RuleDataType，确认type是否存在
+    // 遍历RuleDataType，确认type是否存在(7种数据类型)
     static _parseOpts_enumTypes(k, tmpType) {
         let exists = false;
         for (let i = 0, len = RuleDataType.length; i < len; ++i) {
