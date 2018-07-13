@@ -67,56 +67,15 @@ class MgrImpl extends EventEmitter{
         this.__DbCocMap[dataKey] = S_DbCoc([dbName, cocName]);
         this.__rDataMap[dataKey] = {};
         this.__DataMap[dataKey] = {};
-        this.loadRule(dataKey, rule);
+        this._loadRule(dataKey, rule);
         return this.__DbCocMap[dataKey];
     }
 
-    // 定时器
-    _startTick() {
-        logger.TRACE('_startTick: begin');
-        if (undefined !== this.__tickT) {
-            return;
-        }
-        this.__tickT = setInterval(() => {
-            // if (this.__status != MgrImpl_stage.Running) {
-            //     return;
-            // }
-            this._tick();//量级: 48*20次/100ms
-        }, 100);
-    }
-    _tick() {
-        let now = Date.now();
-        let saveLimit = G_SaveLimit;
-        for (let key in this.__DbCocMap) {
-            this._state(now);
-            if (this.__status != MgrImpl_stage.Running) {
-                logger.TRACE('[MgrImpl._tick] wait running.');
-                return;
-            }
-            // console.log(key, this.__DbCocMap[key]);
-            this.__DbCocMap[key].Tick(now);
-            if (saveLimit > 0) {
-                saveLimit -= this.__DbCocMap[key].TickSaveMsg(now, saveLimit);
-            }
-        }
-    }
-    _state(now) {
-        if (this.__nextStatePrint + 10000 > now) {
-            return;
-        }
-        this.__nextStatePrint = now + 10000;
-        logger.INFO('[MgrImpl._state] __status:'+this.__status+
-            ', __DbMap:'+Object.keys(this.__DbMap).length+
-            ',__DbCocMap:'+Object.keys(this.__DbCocMap).length+
-            ',__rDataMap:'+Object.keys(this.__rDataMap).length+
-            ',__DataMap:'+Object.keys(this.__DataMap).length+
-            ',__RuleMap:'+Object.keys(this.__RuleMap).length);
-        for (let k in this.__rDataMap) {
-            logger.INFO('[MgrImpl._state] __rDataMap k('+k+'): '+ Object.keys(this.__rDataMap[k]).length);
-        }
+    IsStopped() {
+        return this.__status == MgrImpl_stage.Stoped;
     }
 
-    loadRule(dataKey, rule) {
+    _loadRule(dataKey, rule) {
         if (undefined !== this.__RuleMap[dataKey]) {
             throw new Error('[MgrImpl.loadRule] rule('+dataKey+') duplicated.');
         }
@@ -325,11 +284,6 @@ class MgrImpl extends EventEmitter{
         return res;
     }
 
-
-    IsStopped() {
-        return this.__status == MgrImpl_stage.Stoped;
-    }
-
     /////////////////////////////////////////////////////////////////////////////
     _parseArgs(opts) {
         this._opts = {};
@@ -351,7 +305,7 @@ class MgrImpl extends EventEmitter{
         }
 
         MeOpts.host = (undefined === opts.host) ? '127.0.0.1': opts.host;
-        MeOpts.port = (undefined === opts.port) ? '127.0.0.1': opts.port;
+        MeOpts.port = (undefined === opts.port) ? '27017': opts.port;
         MeOpts.databases = opts.databases;
 
         if (opts.auth) {
@@ -395,6 +349,51 @@ class MgrImpl extends EventEmitter{
             this.__DbMap[dbName] = S_Db(dbName, this);//this指向MgrImpl, initDb
         });
         this._startTick();
+    }
+
+    // 定时器
+    _startTick() {
+        logger.TRACE('_startTick: begin');
+        if (undefined !== this.__tickT) {
+            return;
+        }
+        this.__tickT = setInterval(() => {
+            // if (this.__status != MgrImpl_stage.Running) {
+            //     return;
+            // }
+            this._tick();//量级: 48*20次/100ms
+        }, 100);
+    }
+    _tick() {
+        let now = Date.now();
+        let saveLimit = G_SaveLimit;
+        for (let key in this.__DbCocMap) {
+            this._state(now);
+            if (this.__status != MgrImpl_stage.Running) {
+                logger.TRACE('[MgrImpl._tick] wait running.');
+                return;
+            }
+            // console.log(key, this.__DbCocMap[key]);
+            this.__DbCocMap[key].Tick(now);
+            if (saveLimit > 0) {
+                saveLimit -= this.__DbCocMap[key].TickSaveMsg(now, saveLimit);
+            }
+        }
+    }
+    _state(now) {
+        if (this.__nextStatePrint + 10000 > now) {
+            return;
+        }
+        this.__nextStatePrint = now + 10000;
+        logger.INFO('[MgrImpl._state] __status:'+this.__status+
+            ', __DbMap:'+Object.keys(this.__DbMap).length+
+            ',__DbCocMap:'+Object.keys(this.__DbCocMap).length+
+            ',__rDataMap:'+Object.keys(this.__rDataMap).length+
+            ',__DataMap:'+Object.keys(this.__DataMap).length+
+            ',__RuleMap:'+Object.keys(this.__RuleMap).length);
+        for (let k in this.__rDataMap) {
+            logger.INFO('[MgrImpl._state] __rDataMap k('+k+'): '+ Object.keys(this.__rDataMap[k]).length);
+        }
     }
 
     static Instance(opts) {
