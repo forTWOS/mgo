@@ -162,16 +162,6 @@ class MgrImpl extends EventEmitter{
         }
 
         const rules = this.__RuleMap[key].GetRules();
-        if (isCreated) {
-            //数据类型检测
-            const srules = this.__RuleMap[key];
-            for (let k in data) {
-                if (undefined !== rules[k] && !srules.CheckPath(k, data[k])) {
-                    logger.WARN('[MgrImpl.doCreateData] from create data check key('+k+') err.');
-                    data[k] = srules.CheckPathAndReset(rules[k], data[k]);
-                }
-            }
-        }
 
         this.__rDataMap[key][id] = {};
         // logger.TRACE("__rDataMap size:", Object.keys(this.__rDataMap[key]).length);
@@ -273,11 +263,25 @@ class MgrImpl extends EventEmitter{
         // console.log(this.__DataMap[key][id]);
         // 第2种方式，Set,Get函数,先看效率
 
-        for (let k in data) {
-            if (undefined !== dataInstance[k]) {
-                dataInstance[k] = data[k];
+        if (this.IsDebug()) {
+            //数据类型检测
+            const srules = this.__RuleMap[key];
+            for (let k in data) {
+                if (undefined !== rules[k]) {
+                    if (!srules.CheckPath(k, data[k])) {
+                        logger.WARN('[MgrImpl.doCreateData] data check key('+k+') err.');
+                        if (isCreated) {
+                            dataInstance[k] = srules.CheckPathAndReset(rules[k], data[k]);
+                        }
+                    } else {
+                        dataInstance[k] = data[k];
+                    }
+                } else {
+                    logger.WARN('[MgrImpl.doCreateData] data key('+k+') undefined in rule.');
+                }
             }
         }
+
         let defaults = this.__RuleMap[key].GetDefaults();
         if (defaults) {
             for (let k in defaults) {
@@ -288,7 +292,7 @@ class MgrImpl extends EventEmitter{
             }
         }
         let defaultsFunc = this.__RuleMap[key].GetDefaultsFunc();
-        logger.TRACE(defaultsFunc);
+        // logger.TRACE('[MgrImpl.doCreateData] defaultsFunc:', defaultsFunc);
         if (defaultsFunc) {
             for (let k in defaultsFunc) {
                 if (undefined === data[k]) {
@@ -320,9 +324,20 @@ class MgrImpl extends EventEmitter{
     }
 
     /////////////////////////////////////////////////////////////////////////////
+    //在debug下，开启子类型检测
+    // release下，关闭
+    IsDebug() {
+        return this._opts.IsDebug;
+    }
     _parseArgs(opts) {
         this._opts = {};
         this._parseArgsDb(opts.db);
+        this._opts.env = opts.env || 'development';
+        if (this._opts.env == 'development') {
+            this._opts.IsDebug = true;
+        } else {
+            this._opts.IsDebug = false;
+        }
 
         return true;
     }

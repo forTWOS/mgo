@@ -94,7 +94,7 @@ class Data{
             return ErrCode.Data.PathInvalid;
         }
 
-        if (!GetRule(this.__key).CheckPath(rootKey, this[rootKey])) {
+        if (G_MgrImpl._mgr.IsDebug() && !GetRule(this.__key).CheckPath(rootKey, this[rootKey])) {
             logger.WARN('[Data.SetChange] err: id('+this.__id+'), path('+path+') data check failed.');
             return ErrCode.Data.RuleCheckFailed;
         }
