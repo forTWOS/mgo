@@ -2,7 +2,7 @@
  * Created by Linqy on 2018\6\28 0027.
  * db连接封装,1个数据库db==1个Db
  */
-const logger = require('../../Logger');
+const util = require('./util');
 
 const EventEmitter = require('events').EventEmitter;
 const mongodb = require('mongodb'),
@@ -83,18 +83,18 @@ class Db extends EventEmitter {
         if (undefined === count) {
             count = 0;
         } else {
-            logger.INFO('[Db.reconnect] count:'+count);
+            util.GetLogger().INFO('[Db.reconnect] count:'+count);
         }
         MongoClient.connect(this._connStr, this._dbOpts, (err, db) => {
             if (err != null) {
                 if (count === DbFirstReconnectTries) {
                     process.nextTick(()=>{//不可放throw后，会不执行
-                        logger.ERROR('[Db.reconnect] error: process.exit.');
+                        util.GetLogger().ERROR('[Db.reconnect] error: process.exit.');
                         process.exit();
                     });
                     throw new Error("connect mongodb error:" + err.toString());
                 } else {
-                    logger.ERROR('[Db.reconnect] connect('+count+' mongodb error:' + err.toString());
+                    util.GetLogger().ERROR('[Db.reconnect] connect('+count+' mongodb error:' + err.toString());
                     this.reconnect(count+1);
                     return;
                 }
@@ -103,7 +103,7 @@ class Db extends EventEmitter {
             this._db = db;
             this._dbHandler();
             this._status = Db_status.Connted;
-            logger.INFO('connected success.');
+            util.GetLogger().INFO('connected success.');
             G_MgrImpl._mgr.emit('connect');
             // this._test();
         });
@@ -141,7 +141,7 @@ class Db extends EventEmitter {
                 }
                 case 'reconnect': {
                     this._status = Db_status.Connted;
-                    // logger.TRACE(err._privProp, this._db._privProp);// err此处err是db连接实例
+                    // util.GetLogger().TRACE(err._privProp, this._db._privProp);// err此处err是db连接实例
                     // this._test();
                     break;
                 }
@@ -150,9 +150,9 @@ class Db extends EventEmitter {
                     break;
                 }
             }
-            logger.WARN('[Db._onEvent] ', this._status, eventStr);
+            util.GetLogger().WARN('[Db._onEvent] ', this._status, eventStr);
             G_MgrImpl._mgr.emit(eventStr);//setTimeout(()=>{}, 2000);
-            // logger.TRACE(err);
+            // util.GetLogger().TRACE(err);
         };
     }
     // // Add listeners
@@ -165,8 +165,8 @@ class Db extends EventEmitter {
     // }
     // _test() {
     //     this._db.collection('config').findOne(function(err, ...data) {
-    //         logger.TRACE(err);
-    //         logger.TRACE(...data);
+    //         util.GetLogger().TRACE(err);
+    //         util.GetLogger().TRACE(...data);
     //     });
     // }
 }

@@ -5,7 +5,7 @@
  */
 const mongodb = require('mongodb'),
     ObjectId = mongodb.ObjectId;
-const logger = require('../../Logger');
+const util = require('./util');
 
 const ErrCode = require('./ErrCode');
 
@@ -43,7 +43,7 @@ class DbCoc {
             return;
         }
         this.__statePrintTime = now;
-        logger.INFO('[DbCoc.State] __key:' + this.__key + ', __saveMsgCount:' + this.__saveMsgCount + ', __saveMsgMap:' + Object.keys(this.__saveMsgMap).length);
+        util.GetLogger().INFO('[DbCoc.State] __key:' + this.__key + ', __saveMsgCount:' + this.__saveMsgCount + ', __saveMsgMap:' + Object.keys(this.__saveMsgMap).length);
     }
 
     // 100ms/次
@@ -59,20 +59,32 @@ class DbCoc {
     Create(obj, cb) {
         let data = G_MgrImpl._mgr.CreateData([this.__dbName, this.__cocName], obj);
         if (null === data) {
-            logger.WARN('[DbCoc.Create] err: Create Data('+this.__dbName+','+this.__cocName+','+obj._id.toString()+') failed.');
+            util.GetLogger().WARN('[DbCoc.Create] err: Create Data('+this.__dbName+','+this.__cocName+','+obj._id.toString()+') failed.');
             cb(ErrCode.DbCoc.CreateDataError);
             return;
         }
-        // logger.TRACE(data);
+        // util.GetLogger().TRACE(data);
         data.Save();
         // this.Insert(obj, cb);
         cb(ErrCode.Ok, data);
+    }
+    CreateMore(objs, cb) {//todo:test
+        let res = [];
+        let hb = (err, data) => {
+            res.push(err ? null : data);
+            if (res.length == objs.length) {
+                cb(ErrCode.Ok, res);
+            }
+        };
+        objs.forEach((obj) => {
+            this.Create(obj, hb);
+        });
     }
     // 通过id，去mongodb库加载数据，并返回Data封装
     // 此处返回的接口，用于各业务模块数据操作
     Load(id, cb) {
         let sdata = G_MgrImpl._mgr.GetData(this.__key, id);
-        // logger.TRACE('[DbCoc.Load] sdata:', this.__key, id, sdata);
+        // util.GetLogger().TRACE('[DbCoc.Load] sdata:', this.__key, id, sdata);
         if (undefined !== sdata) {
             // 此处目标: 中断Data.Stop流程
             // 检测Data是否在走Data.Stop流程
@@ -94,7 +106,7 @@ class DbCoc {
     // }
     // 保存给定的值
     Save(id, sets, cb) {
-        logger.TRACE('[DbCoc.Save] begin');
+        util.GetLogger().TRACE('[DbCoc.Save] begin');
         this.Update({_id: id}, {'$set': sets}, cb);
     }
     // 强制保存id下的data全值
@@ -103,18 +115,18 @@ class DbCoc {
         let data = G_MgrImpl._mgr.GetRData(this.__key, id);
         if (undefined === data) {
             let errStr = '[DbCoc.SaveForce] key('+this.__key+'.'+id+') data undefined.';
-            logger.TRACE(errStr);
+            util.GetLogger().TRACE(errStr);
             cb(errStr);
             return;
         }
         this.Update({_id: data._id}, data, {upsert: true}, cb);
     }
     doCreate(id, cb) {
-        logger.TRACE('[DbCoc.doCreate] begin.');
+        util.GetLogger().TRACE('[DbCoc.doCreate] begin.');
         let data = G_MgrImpl._mgr.GetRData(this.__key, id);
         if (undefined === data) {
             let errStr = '[DbCoc.doCreate] key('+this.__key+'.'+id+') data undefined.';
-            logger.TRACE(errStr);
+            util.GetLogger().TRACE(errStr);
             cb(errStr);
             return;
         }
@@ -154,7 +166,7 @@ class DbCoc {
         }
 
         if (ids.length == 0) {//应该不会运行到
-            logger.WARN('[DbCoc.TickSaveMsg] err: __saveMsgMap empty.');
+            util.GetLogger().WARN('[DbCoc.TickSaveMsg] err: __saveMsgMap empty.');
             return 0;
         }
 
@@ -172,7 +184,7 @@ class DbCoc {
                 if (errCode || sdata.IsChanged() || sdata.IsCreated()) {
                     sdata.Save(); // 重走保存流程
                 } else if (sdata.IsStop()) {//清理流程 有Data.isStop标志
-                    logger.INFO('[DbCoc.doSave] clear Data:', id);// 重要处理，打印一下
+                    util.GetLogger().INFO('[DbCoc.doSave] clear Data:', id);// 重要处理，打印一下
                     G_MgrImpl._mgr.RemoveData(this.__key, id);
                 }
                 if (--cn == 0) {
@@ -180,7 +192,7 @@ class DbCoc {
                 }
             });
         }
-        logger.TRACE('[DbCoc.TickSaveMsg] ids:' + ids.length + ', this.__saveMsgCount:'+ this.__saveMsgCount);
+        util.GetLogger().TRACE('[DbCoc.TickSaveMsg] ids:' + ids.length + ', this.__saveMsgCount:'+ this.__saveMsgCount);
         return ids.length;
     }
     HadSaveMsg(id) {
@@ -233,7 +245,7 @@ class DbCoc {
                 opts = {};
             }
             if (undefined === cb || typeof cb !== 'function') {
-                logger.WARN('[DbCoc.One] err: params invalid');
+                util.GetLogger().WARN('[DbCoc.One] err: params invalid');
                 throw new Error('[DbCoc.One] err: params invalid');
             }
         }
@@ -261,7 +273,7 @@ class DbCoc {
                 opts = {};
             }
             if (undefined === cb || typeof cb !== 'function') {
-                logger.WARN('[DbCoc.OneOriginal] err: params invalid');
+                util.GetLogger().WARN('[DbCoc.OneOriginal] err: params invalid');
                 throw new Error('[DbCoc.OneOriginal] err: params invalid');
             }
         }
@@ -289,7 +301,7 @@ class DbCoc {
         //         opts = {};
         //     }
         //     if (undefined === cb || typeof cb !== 'function') {
-        //         logger.WARN('[DbCoc.Find] err: params invalid');
+        //         util.GetLogger().WARN('[DbCoc.Find] err: params invalid');
         //         throw new Error('[DbCoc.Find] err: params invalid');
         //     }
         // }
@@ -302,7 +314,7 @@ class DbCoc {
         opts.timeout = 5000;//5秒超时
         opts.limit = 1;
 
-        // logger.DEBUG(find, filter, opts);
+        // util.GetLogger().DEBUG(find, filter, opts);
         coc.find(find, filter, opts).next(cb);
     }
 
@@ -319,7 +331,7 @@ class DbCoc {
                 opts = {};
             }
             if (undefined === cb || typeof cb !== 'function') {
-                logger.WARN('[DbCoc.Find] err: params invalid');
+                util.GetLogger().WARN('[DbCoc.Find] err: params invalid');
                 throw new Error('[DbCoc.Find] err: params invalid');
             }
         }
@@ -347,7 +359,7 @@ class DbCoc {
                 opts = {};
             }
             if (undefined === cb || typeof cb !== 'function') {
-                logger.WARN('[DbCoc.FindOriginal] err: params invalid');
+                util.GetLogger().WARN('[DbCoc.FindOriginal] err: params invalid');
                 throw new Error('[DbCoc.FindOriginal] err: params invalid');
             }
         }
@@ -402,7 +414,7 @@ class DbCoc {
     // update
     Update(find, set, opts, cb) {
         if (undefined === find || undefined === set) {
-            logger.WARN('[DbCoc.Update] err: params invalid.');
+            util.GetLogger().WARN('[DbCoc.Update] err: params invalid.');
             cb(ErrCode.ParamsErr);
             return;
         }
@@ -436,11 +448,11 @@ class DbCoc {
                 return;
             }
             if (!res.result.ok || (res.matchedCount != 1 && res.upsertedCount != 1)) {
-                logger.WARN('update err:' + res+', res.matchedCount:'+res.matchedCount+',res.upsertedCount:'+res.upsertedCount);
+                util.GetLogger().WARN('update err:' + res+', res.matchedCount:'+res.matchedCount+',res.upsertedCount:'+res.upsertedCount);
                 cb(ErrCode.DbCoc.DbProcessErr);
                 return;
             }
-            // logger.TRACE(res);
+            // util.GetLogger().TRACE(res);
             cb(null);
         });
     }

@@ -5,7 +5,7 @@
 
 const mongodb = require('mongodb'),
     ObjectId = mongodb.ObjectId;
-const logger = require('../../Logger');
+const util = require('./util');
 
 /*
 * {
@@ -116,10 +116,13 @@ class Rule {
         }
         return this._defaultsFunc;
     }
+    GetTableName() {
+        return this._tableName;
+    }
 
     // 按规则检测数据，并将异常数据初始化
     CheckPathAndReset(rule, data) {
-        logger.TRACE('[Rule.CheckPathAndReset] begin.', rule.type, typeof data);
+        util.GetLogger().TRACE('[Rule.CheckPathAndReset] begin.', rule.type, typeof data);
         let dataType = rule.type;
         switch (dataType) {
             case 'string': {
@@ -175,7 +178,7 @@ class Rule {
                 return data;
             }
             default: {
-                logger.WARN('[Rule.CheckPathAndReset] should not here.' + dataType);
+                util.GetLogger().WARN('[Rule.CheckPathAndReset] should not here.' + dataType);
                 break;
             }
         }//switch(tmpData.type)
@@ -183,12 +186,12 @@ class Rule {
         return undefined;
     }
     CheckPath(path, data) {//path是根结点,该结点数据
-        logger.TRACE('[Rule.CheckPath] begin:'+path, typeof data);
+        util.GetLogger().TRACE('[Rule.CheckPath] begin:'+path, typeof data);
         if (undefined === this._rules[path] && undefined !== data) {
             return false;
         }
         let rule = this._rules[path];
-        logger.TRACE('[Rule.CheckPath] rule.type:', rule.type);
+        util.GetLogger().TRACE('[Rule.CheckPath] rule.type:', rule.type);
         if (rule.type != 'object' && rule.type != 'array') {
             return true;
         }
@@ -202,7 +205,7 @@ class Rule {
         // return true;
     }
     _checkPath(rule, data) {
-        logger.TRACE('[Rule._checkPath] begin need(' + rule.type + '), data('+ typeof data+')');
+        util.GetLogger().TRACE('[Rule._checkPath] begin need(' + rule.type + '), data('+ typeof data+')');
         let dataType = rule.type;
         switch (dataType) {
             case 'string': {
@@ -235,14 +238,14 @@ class Rule {
             case 'object': {
                 for (let k in rule.typeExt) {
                     if (undefined !== data[k] && !this._checkPath(rule.typeExt[k], data[k])) {
-                        logger.WARN('[Rule._checkPath] failed: '+k+',must('+ rule.typeExt[k].type + '),check failed.');
+                        util.GetLogger().WARN('[Rule._checkPath] failed: '+k+',must('+ rule.typeExt[k].type + '),check failed.');
                         return false;
                     }
                 }
                 break;
             }
             default: {
-                logger.WARN('[Rule._checkPath] should not here.');
+                util.GetLogger().WARN('[Rule._checkPath] should not here.');
                 break;
             }
         }//switch(tmpData.type)
@@ -253,6 +256,8 @@ class Rule {
     parseOpts(opts) {
         if (undefined !== opts.tableName && 'string' === typeof opts.tableName) {
             this._tableName = opts.tableName;
+        } else {
+            throw new Error('[Rule.parseOpts] err: tableName undefined.');
         }
         if (undefined === opts.data || 'object' !== typeof opts.data) {
             throw new Error('[Rule.parseOpts] err: data undefined.');

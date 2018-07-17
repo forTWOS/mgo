@@ -3,7 +3,7 @@
  */
 const mongodb = require('mongodb'),
     ObjectId = mongodb.ObjectId;
-const S_Rule = require('./lib/Rule');
+const mgo = require('./mgo');
 
 const ItemsOpts =
     {
@@ -108,7 +108,7 @@ const ItemsOpts =
     };
 
 const StatisticOpts ={
-    name: 'statistic',
+    tableName: 'statistic',
     data: {
         _id: {type: String},
         fightValue_MJ:{type: Number}, //战场模式
@@ -120,5 +120,5 @@ const StatisticOpts ={
         items: {type: [ ItemsOpts] }
     }
 };
-const StatisticRule = S_Rule(StatisticOpts);
-module.exports = StatisticRule;
+const StatisticCoc = mgo.Load(['', StatisticOpts]);
+module.exports = StatisticCoc;

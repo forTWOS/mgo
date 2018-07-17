@@ -4,15 +4,8 @@
  * 所以：此文件中MgrImpl.Instance，需在MgrImpl完成后，再取值
  */
 const ErrCode = require('./ErrCode');
-const logger = require('../../Logger');
 const G_MgrImpl = global.MgrImpl;
-
-const GetCoc = (key) => {
-    return G_MgrImpl._mgr.GetDbCoc(key);
-};
-const GetRule = (key) => {
-    return G_MgrImpl._mgr.GetRule(key);
-};
+const util = require('./util');
 
 const LastErrorTimeLimit = 10000;
 
@@ -42,7 +35,7 @@ class Data{
             return;
         }
         if (!this.IsChanged() && !this.IsCreated() && !this.isSaving()) {
-            logger.INFO('[Data.Stop] clear Data:', this.__id);// 重要处理，打印一下
+            util.GetLogger().INFO('[Data.Stop] clear Data:', this.__id);// 重要处理，打印一下
             G_MgrImpl._mgr.RemoveData(this.__key, this.__id);
             return;
         }
@@ -86,46 +79,46 @@ class Data{
     //    1. gold
     //    2. face.front
     SetChange(path) {
-        logger.DEBUG('[Data.SetChange]  id('+this.__id+'), begin: ', path);
+        util.GetLogger().DEBUG('[Data.SetChange]  id('+this.__id+'), begin: ', path);
         let tmp_path = this.parsePath(path);
         let rootKey = tmp_path[0];
         if (0 == tmp_path.length /*|| '_id' == rootKey*/ || 'string' != typeof rootKey/* || undefined === this[rootKey]*/) {//空值或_id(不可变)或非string
-            logger.WARN('[Data.SetChange] err: id('+this.__id+'), path('+path+') invalid.');
+            util.GetLogger().WARN('[Data.SetChange] err: id('+this.__id+'), path('+path+') invalid.');
             return ErrCode.Data.PathInvalid;
         }
 
-        if (G_MgrImpl._mgr.IsDebug() && !GetRule(this.__key).CheckPath(rootKey, this[rootKey])) {
-            logger.WARN('[Data.SetChange] err: id('+this.__id+'), path('+path+') data check failed.');
+        if (G_MgrImpl._mgr.IsDebug() && !util.GetRule(this.__key).CheckPath(rootKey, this[rootKey])) {
+            util.GetLogger().WARN('[Data.SetChange] err: id('+this.__id+'), path('+path+') data check failed.');
             return ErrCode.Data.RuleCheckFailed;
         }
 
         this.__changedRoot[rootKey] = 1; // 初始化改为列表
         this.__changedRootExists = true; // 标志：仅为运算方便
-        logger.DEBUG('[Data.SetChange] succ: id('+this.__id+'), ', path);
+        util.GetLogger().DEBUG('[Data.SetChange] succ: id('+this.__id+'), ', path);
         return ErrCode.Ok;
     }
     // 因为是消息处理，不使用cb等待
     // 下层保证数据不丢失(事件方案)
     Save() {
-        logger.DEBUG('[Data.Save] begin', this.__id);
+        util.GetLogger().DEBUG('[Data.Save] begin', this.__id);
         if (this.__lastErrorTime > Date.now()) {//错误后10秒内，不进行操作
             return;
         }
         //无改变则不处理
         //操作正在进行中,等操作结束，进行触发
         if ((!this.IsChanged() && !this.IsCreated()) || this.isSaving()) {
-            logger.DEBUG('[Data.Save] id, !IsChanged || isSaving || !IsCreated', this.__id, !this.IsChanged(), this.isSaving(), !this.IsCreated());
+            util.GetLogger().DEBUG('[Data.Save] id, !IsChanged || isSaving || !IsCreated', this.__id, !this.IsChanged(), this.isSaving(), !this.IsCreated());
             return;
         }
 
-        if (GetCoc(this.__key).HadSaveMsg(this.__id)) {
+        if (util.GetCoc(this.__key).HadSaveMsg(this.__id)) {
             return;
         }
 
-        GetCoc(this.__key).AddSaveMsg(this.__id);
+        util.GetCoc(this.__key).AddSaveMsg(this.__id);
     }
     DoSave(cb) {
-        logger.TRACE('[Data.DoSave] begin.');
+        util.GetLogger().TRACE('[Data.DoSave] begin.');
         if (this.IsCreated()) {
             this.__isCreated = false;
             this.clearChangedRoot();
@@ -134,7 +127,7 @@ class Data{
         }
 
         if (!this.IsChanged()) {
-            logger.WARN('[Data.Save] key('+this.__key+'.'+this.__id+') data empty.');
+            util.GetLogger().WARN('[Data.Save] key('+this.__key+'.'+this.__id+') data empty.');
             if (undefined !== cb) {
                 cb(ErrCode.Ok);
             }
@@ -142,9 +135,9 @@ class Data{
         }
 
         //取真实数据
-        let data = G_MgrImpl._mgr.GetRData(this.__key, this.__id);
+        let data = util.GetRData(this.__key, this.__id);
         if (undefined === data) {
-            logger.ERROR('[Data.Save] key('+this.__key+'.'+this.__id+') data undefined.');
+            util.GetLogger().ERROR('[Data.Save] key('+this.__key+'.'+this.__id+') data undefined.');
             if (undefined !== cb) {
                 cb(ErrCode.Data.DataNotExists);
             }
@@ -155,20 +148,20 @@ class Data{
         let sets = {};
         for (let k in this.__changedRoot) {
             if (undefined === data[k]) {
-                logger.TRACE('[Data.Save] key('+k+') is undefined.');
+                util.GetLogger().TRACE('[Data.Save] key('+k+') is undefined.');
                 continue;
             }
             sets[k] = data[k];
         }
         // 备份当前保存root点
         this.__changedRoot_ing = this.__changedRoot;
-        logger.TRACE('[Data.DoSave] ', this.__changedRoot_ing);
+        util.GetLogger().TRACE('[Data.DoSave] ', this.__changedRoot_ing);
 
         // 清理标志
         this.clearChangedRoot();
 
-        GetCoc(this.__key).Save(this.__idObj, sets, (err) => {
-            logger.DEBUG('[Data.DoSave] result:', this.__id, err);
+        util.GetCoc(this.__key).Save(this.__idObj, sets, (err) => {
+            util.GetLogger().DEBUG('[Data.DoSave] result:', this.__id, err);
             if (err) { // 存储失败，将改root还给__changeRoot
                 for (let k in this.__changedRoot_ing) {
                     this.__changedRoot[k] = this.__changedRoot_ing[k];
@@ -182,8 +175,8 @@ class Data{
         });
     }
     SaveForce(cb) { //强制保存所有数据
-        GetCoc(this.__key).SaveForce(this.__idObj, (err) => {
-            logger.DEBUG('[Data.SaveForce] :', this.__id, err);
+        util.GetCoc(this.__key).SaveForce(this.__idObj, (err) => {
+            util.GetLogger().DEBUG('[Data.SaveForce] :', this.__id, err);
             if (err) {
                 this.setLastErrorTime();
             }
@@ -193,10 +186,10 @@ class Data{
         });
     }
     doCreate(cb) { //强制保存所有数据
-        logger.TRACE('[Data.doCreate] begin.');
+        util.GetLogger().TRACE('[Data.doCreate] begin.');
         this.__changedRoot_ing = true;
-        GetCoc(this.__key).doCreate(this.__idObj, (err) => {
-            logger.DEBUG('[Data.doCreate] result :', this.__id, err);
+        util.GetCoc(this.__key).doCreate(this.__idObj, (err) => {
+            util.GetLogger().DEBUG('[Data.doCreate] result :', this.__id, err);
             if (err) { // 存储失败，将改root还给__changeRoot
                 this.__isCreated = true;
                 this.setLastErrorTime();

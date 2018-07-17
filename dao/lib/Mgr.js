@@ -8,7 +8,6 @@
 * 命名，遵守驼峰法
 * 首字母大写，表示对外
 * */
-const logger = require('../../Logger');
 //singleton
 const MgrImpl = require('./MgrImpl');
 
@@ -26,11 +25,11 @@ pro.CreateMgr = function(opts) {
     return _Mgr;
 };
 
-pro.Load = function([dbName, cocName, rule]) {
+pro.Load = function(...args) {
     if (!_Isinited) {
         throw new Error('[MgrImpl] not inited.');
         // logger("[MgrImpl] not inited.")
         // return;
     }
-    return _Mgr.Load([dbName, cocName, rule]);
+    return _Mgr.Load(...args);
 };

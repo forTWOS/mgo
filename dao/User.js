@@ -4,7 +4,7 @@
 
 const mongodb = require('mongodb'),
     ObjectId = mongodb.ObjectId;
-const S_Rule = require('./lib/Rule');
+const mgo = require('./mgo');
 
 const signInfoRuleOptsExt = {
     _id: {type: ObjectId},
@@ -59,6 +59,6 @@ const RuleOpts = {
         // 数组或对象内，不做索引
     }
 };
-const UserRule = S_Rule(RuleOpts);
-// console.log(UserRule._rules.oVal.typeExt.subObj);
-module.exports = UserRule;
+
+const scoc = mgo.Load(['', RuleOpts]);
+module.exports = scoc;

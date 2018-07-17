@@ -2,18 +2,17 @@
  * Created by Linqy on 2018\6\28 0027.
  */
 
-const logger = require('../../Logger');
+let logger = require('./Logger');//如无设置，默认
 const EventEmitter = require('events').EventEmitter;
 const mongodb = require('mongodb'),
-    ObjectId = mongodb.ObjectId,
-    Timestamp = mongodb.Timestamp;
+    ObjectId = mongodb.ObjectId;
 
 const G_MgrImpl = global.MgrImpl = {};//全局：当前为取_mgr
 
 const S_Db = require('./Db');//数据库连接封装
 const S_DbCoc = require('./DbCoc');//数据表封装
 const S_Data = require('./Data'); // 数据封装
-// const S_Rule = require('./Rule'); // 规则封装
+const S_Rule = require('./Rule'); // 规则封装
 
 const G_SaveLimit = 200;
 
@@ -39,6 +38,7 @@ class MgrImpl extends EventEmitter{
         this.__tickT = undefined;// 定时器句柄
         this.__status = MgrImpl_stage.Uninited;
         this.__nextStatePrint = 0;//下次状态打印时间
+        this.__defaultDbName = undefined;// 默认dbName，取配置的第1个
 
 
         if (!this._parseArgs(opts)) {
@@ -49,12 +49,18 @@ class MgrImpl extends EventEmitter{
         this.__status = MgrImpl_stage.Inited;
     }
     // return DbCoc=>数据操作
-    Load([dbName, cocName, rule]) { // 做成无阻塞的接口，在require初始化
-        if (undefined === dbName || undefined === cocName) {
+    Load([dbName, ruleOpts]) { // 做成无阻塞的接口，在require初始化
+        const rule = S_Rule(ruleOpts);//规则化-检测
+
+        let cocName = rule.GetTableName();
+        if (undefined === cocName) {
             throw new Error('[MgrImpl.Load] invalid params.');
         }
+        if (!dbName) {
+            dbName = this.__defaultDbName;
+        }
         if (undefined === this.__DbMap[dbName]) {
-            throw new Error('[MgrImpl.Load] uninited dbName.');
+            throw new Error('[MgrImpl.Load] uninited dbName('+dbName+').');
         }
         let dataKey = dbName+'/'+cocName;
         if (undefined === this.__DbCocMap[dataKey]) {
@@ -149,10 +155,10 @@ class MgrImpl extends EventEmitter{
         return dataInstance;
     }
     doCreateData([dbName, cocName, isCreated], data) {
-        if (undefined === data._id) {
-            logger.WARN('[MgrImpl.doCreateData] err: data._id undefined.');
-            return null;
-        }
+        // if (undefined === data._id) {// 若未设，将自动创建 Rule
+        //     logger.WARN('[MgrImpl.doCreateData] err: data._id undefined.');
+        //     return null;
+        // }
         let key = dbName + '/' + cocName;
         let id = data._id.toString();
         logger.TRACE('[MgrImpl.doCreateData] id:',id, typeof data._id);
@@ -329,11 +335,20 @@ class MgrImpl extends EventEmitter{
     IsDebug() {
         return this._opts.IsDebug;
     }
+    GetDefaultDbName() {
+        return this.__defaultDbName;
+    }
     _parseArgs(opts) {
         this._opts = {};
         this._parseArgsDb(opts.db);
         this._opts.env = opts.env || 'development';
         this._opts.IsDebug = this._opts.env === 'development';
+        if (opts.logger) {
+            this.logger = opts.logger;
+            logger = this.logger;
+        } else {
+            this.logger = logger;
+        }
 
         return true;
     }
@@ -391,6 +406,9 @@ class MgrImpl extends EventEmitter{
         this._opts.db.databases.forEach(dbName => {
             if (undefined !== this.__DbMap[dbName]) {
                 return;
+            }
+            if (undefined === this.__defaultDbName) {
+                this.__defaultDbName = dbName;
             }
             this.__DbMap[dbName] = S_Db(dbName, this);//this指向MgrImpl, initDb
         });

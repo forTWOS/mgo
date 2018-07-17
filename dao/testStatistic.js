@@ -31,12 +31,9 @@ const opts ={
 //     throw e;
 // }
 
-const StatisticRule = require('./Statistic');
-// const S_Rule = require('./lib/Rule');
-const coc = require('./lib/Mgr').Load(['thcoc', 'statistic', StatisticRule]);
-// }catch(e) {
-//     throw e;
-// }
+// const StatisticRule = require('./Statistic');
+// const coc = require('./lib/Mgr').Load(['thcoc', 'statistic', StatisticRule]);
+const coc = require('./Statistic');
 
 //测试数据
 
