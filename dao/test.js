@@ -34,13 +34,11 @@ const logger = ()=>{};//console.log;
 // setTimeout(()=> { //遍开mongodb.connect时，阻塞导致的连接失败
 
 // try {
-const UserRule = require('./User');
-
-const coc = require('./lib/Mgr').Load(['thcoc', 'user', UserRule]);
+const coc = require('./User');
 // }catch(e) {
 //     throw e;
 // }
-
+return;
 class User {
     constructor(id) {
         this.__id = id;

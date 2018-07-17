@@ -122,7 +122,7 @@ class Rule {
 
     // 按规则检测数据，并将异常数据初始化
     CheckPathAndReset(rule, data) {
-        util.GetLogger().TRACE('[Rule.CheckPathAndReset] begin.', rule.type, typeof data);
+        util.GetLogger().trace('[Rule.CheckPathAndReset] begin.', rule.type, typeof data);
         let dataType = rule.type;
         switch (dataType) {
             case 'string': {
@@ -178,7 +178,7 @@ class Rule {
                 return data;
             }
             default: {
-                util.GetLogger().WARN('[Rule.CheckPathAndReset] should not here.' + dataType);
+                util.GetLogger().warn('[Rule.CheckPathAndReset] should not here.' + dataType);
                 break;
             }
         }//switch(tmpData.type)
@@ -186,12 +186,12 @@ class Rule {
         return undefined;
     }
     CheckPath(path, data) {//path是根结点,该结点数据
-        util.GetLogger().TRACE('[Rule.CheckPath] begin:'+path, typeof data);
+        util.GetLogger().trace('[Rule.CheckPath] begin:'+path, typeof data);
         if (undefined === this._rules[path] && undefined !== data) {
             return false;
         }
         let rule = this._rules[path];
-        util.GetLogger().TRACE('[Rule.CheckPath] rule.type:', rule.type);
+        util.GetLogger().trace('[Rule.CheckPath] rule.type:', rule.type);
         if (rule.type != 'object' && rule.type != 'array') {
             return true;
         }
@@ -205,7 +205,7 @@ class Rule {
         // return true;
     }
     _checkPath(rule, data) {
-        util.GetLogger().TRACE('[Rule._checkPath] begin need(' + rule.type + '), data('+ typeof data+')');
+        util.GetLogger().trace('[Rule._checkPath] begin need(' + rule.type + '), data('+ typeof data+')');
         let dataType = rule.type;
         switch (dataType) {
             case 'string': {
@@ -238,14 +238,14 @@ class Rule {
             case 'object': {
                 for (let k in rule.typeExt) {
                     if (undefined !== data[k] && !this._checkPath(rule.typeExt[k], data[k])) {
-                        util.GetLogger().WARN('[Rule._checkPath] failed: '+k+',must('+ rule.typeExt[k].type + '),check failed.');
+                        util.GetLogger().warn('[Rule._checkPath] failed: '+k+',must('+ rule.typeExt[k].type + '),check failed.');
                         return false;
                     }
                 }
                 break;
             }
             default: {
-                util.GetLogger().WARN('[Rule._checkPath] should not here.');
+                util.GetLogger().warn('[Rule._checkPath] should not here.');
                 break;
             }
         }//switch(tmpData.type)

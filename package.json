@@ -1,6 +1,6 @@
 {
   "dependencies": {
     "generic-pool": "^3.4.2",
-    "mongodb": "^2.2.35"
+    "mongodb": "^3.1.1"
   }
 }
