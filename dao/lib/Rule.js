@@ -94,6 +94,7 @@ class Rule {
         this._defaultsExists = false;
         this._defaultsFunc = {};//默认值是函数的
         this._defaultsFuncExists = false;
+        this._methods = {};
 
         this.parseOpts(opts);
     }
@@ -118,6 +119,9 @@ class Rule {
     }
     GetTableName() {
         return this._tableName;
+    }
+    GetMethods() {
+        return this._methods;
     }
 
     // Check头函数，仅做检查，不可依赖其内其它功能(生产环境，关闭Check)
@@ -271,6 +275,9 @@ class Rule {
 
         // 类型检测
         this._parseOpts_typeCheck(data);
+        if (undefined !== opts.methods) {
+            this._methods = opts.methods;
+        }
     }
 
     // 类型检测

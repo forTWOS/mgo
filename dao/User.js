@@ -57,6 +57,78 @@ const RuleOpts = {
         // 数组或对象内，不做索引
     }
 };
+// 实现方案:
+// 加载规则时，生成对应map,存储类工厂生产出来的各类
+const methods = RuleOpts.methods = {}; //各数据实例操作组
+
+methods.getId = function () {
+    return this._id.toString();
+};
+
+methods.getIdentity = function() {
+    return this.identity || '';
+};
+methods.setIdentity = function(id) {
+    this.identity = id;
+};
+
+methods.getInfo = function () {
+    var info = {};
+    info.uid = this._id.toString();
+    if (info.uid) {
+        info.identity = this.identity || "";
+        info.name = this.name || "";
+        info.level = this.level || 1;
+        info.exp = this.exp || 0;
+        info.sex = this.getSex();
+        info.gold = this.gold || 0;
+        info.score = this.score || 0;
+        info.copper = this.copper || 0;
+        info.native = this.native || 0;
+        //info.lastlogin = this.getLoginTime();
+
+        return info;
+    } else {
+        return null;
+    }
+};
+
+methods.setName = function (newname) {
+    if (newname)
+        this.name = newname;
+};
+
+methods.getName = function () {
+    return this.name || "";
+};
+
+// 默认男
+methods.getSex = function () {
+    if(undefined == this.sex){
+        this.sex = 1;
+    }
+    return this.sex;
+};
+
+
+methods.updateLoginTime = function () {
+    this.lastlogin = new Date();
+};
+methods.getLoginTime = function () {
+    if (!this.lastlogin) {
+        this.lastlogin = new Date();
+    }
+    return this.lastlogin;
+};
+
+methods.setSex = function (sex) {
+    this.sex = sex;
+};
+
+methods.getLevel = function() {
+    return this.level || 1;
+};
+
 
 const UserCoc = mgo.Load(['', RuleOpts]);
 
@@ -77,73 +149,5 @@ UserCoc.findByName = function (name, cb) {
 UserCoc.findByNames = function (names, cb) {
     this.Find({name: {$in: names}}, {name: true}, cb);
 };
-// methods.getId = function () {
-//     return this._id.toString();
-// };
-//
-// methods.getIdentity = function() {
-//     return this.identity || '';
-// };
-// methods.setIdentity = function(id) {
-//     this.identity = id;
-// };
-//
-// methods.getInfo = function () {
-//     var info = {};
-//     info.uid = this._id.toString();
-//     if (info.uid) {
-//         info.identity = this.identity || "";
-//         info.name = this.name || "";
-//         info.level = this.level || 1;
-//         info.exp = this.exp || 0;
-//         info.sex = this.getSex();
-//         info.gold = this.gold || 0;
-//         info.score = this.score || 0;
-//         info.copper = this.copper || 0;
-//         info.native = this.native || 0;
-//         //info.lastlogin = this.getLoginTime();
-//
-//         return info;
-//     } else {
-//         return null;
-//     }
-// };
-//
-// methods.setName = function (newname) {
-//     if (newname)
-//         this.name = newname;
-// };
-//
-// methods.getName = function () {
-//     return this.name || "";
-// };
-//
-// // 默认男
-// methods.getSex = function () {
-//     if(undefined == this.sex){
-//         this.sex = 1;
-//     }
-//     return this.sex;
-// };
-//
-//
-// methods.updateLoginTime = function () {
-//     this.lastlogin = new Date();
-// };
-// methods.getLoginTime = function () {
-//     if (!this.lastlogin) {
-//         this.lastlogin = new Date();
-//     }
-//     return this.lastlogin;
-// };
-//
-// methods.setSex = function (sex) {
-//     this.sex = sex;
-// };
-//
-// methods.getLevel = function() {
-//     return this.level || 1;
-// }
-//
 
 module.exports = UserCoc;

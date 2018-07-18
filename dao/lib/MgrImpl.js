@@ -32,6 +32,7 @@ class MgrImpl extends EventEmitter{
         this.__rDataMap = {};
         this.__DataMap = {};
         this.__RuleMap = {}; // coname: Rule
+        this.__SDataMap = {}; // 各表Data类,主要实现methods功能
         // this.DataTemplateMap = {};// 继承自Data，根据rule规则生成有hook的各表模板
         // this.Event =
         // this.__MsgMap = {};// {dbName+cocName: 1}//消息队列，用于定时在触发DbCoc的真实操作;添加流程:Data.Save->DbCoc.AddMsg->MgrImpl.AddMsg
@@ -63,13 +64,15 @@ class MgrImpl extends EventEmitter{
             throw new Error('[MgrImpl.Load] uninited dbName('+dbName+').');
         }
         let dataKey = dbName+'/'+cocName;
-        if (undefined === this.__DbCocMap[dataKey]) {
-            this.__DbCocMap[dataKey] = {};
-        }
+        // if (undefined === this.__DbCocMap[dataKey]) {
+        //     this.__DbCocMap[dataKey] = {};
+        // }
         // if (undefined !== this.__DbCocMap[dbName][cocName]) {
         //     return this.__DbCocMap[dbName][cocName];
         // }
         // this.__status = MgrImpl_stage.Running;
+
+        this.__SDataMap[dataKey] = MgrImpl._dataFactory(rule.GetMethods());
 
         this.__DbCocMap[dataKey] = S_DbCoc([dbName, cocName]);
         this.__rDataMap[dataKey] = {};
@@ -171,7 +174,8 @@ class MgrImpl extends EventEmitter{
 
         this.__rDataMap[key][id] = {};
         // logger.trace("__rDataMap size:", Object.keys(this.__rDataMap[key]).length);
-        this.__DataMap[key][id] = new S_Data([dbName, cocName], id, data._id);
+        let SubData = this.__SDataMap[key];
+        this.__DataMap[key][id] = new SubData([dbName, cocName], id, data._id);
         const dataInstance = this.__DataMap[key][id];
 
         // console.log(data);
@@ -329,6 +333,21 @@ class MgrImpl extends EventEmitter{
         return res;
     }
 
+    // 经测试，该类工厂可用
+    static _dataFactory(methods) {
+        class SubData extends S_Data {
+            constructor(...args) {
+                super(...args);
+            }
+        }
+        if (undefined !== methods) {
+            for (let k in methods) {
+                SubData.prototype[k] = methods[k];
+            }
+        }
+        return SubData;
+    }
+
     /////////////////////////////////////////////////////////////////////////////
     //在debug下，开启子类型检测
     // release下，关闭
@@ -456,7 +475,8 @@ class MgrImpl extends EventEmitter{
             ',__DbCocMap:'+Object.keys(this.__DbCocMap).length+
             ',__rDataMap:'+Object.keys(this.__rDataMap).length+
             ',__DataMap:'+Object.keys(this.__DataMap).length+
-            ',__RuleMap:'+Object.keys(this.__RuleMap).length);
+            ',__RuleMap:'+Object.keys(this.__RuleMap).length+
+            ',__SDataMap:'+Object.keys(this.__SDataMap).length);
         for (let k in this.__rDataMap) {
             logger.info('[MgrImpl._state] __rDataMap k('+k+'): '+ Object.keys(this.__rDataMap[k]).length);
         }

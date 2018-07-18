@@ -54,7 +54,7 @@ class User {
                 cb(err);
                 return;
             }
-            logger('Create data: ', data);
+            logger('Create data: ', data, data.getId());
             cb(null);
         });
     }

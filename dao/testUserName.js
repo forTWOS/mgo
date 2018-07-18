@@ -57,6 +57,7 @@ class UserName {
             }
             // logger('Login data:', data);
             this.__data = data;
+            console.log(this.__data.G_name());
             cb(null);
         })
     }
@@ -85,6 +86,9 @@ new Promise((re, rj) => {
     })
 }).then(()=>{
     console.log('Create succ');
+    userName.Login((err) => {
+        console.log(err);
+    })
 }, (err)=>{
     console.log('Create error:', err);
 });

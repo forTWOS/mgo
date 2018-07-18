@@ -11,6 +11,10 @@ const UserNameRule = {
         name: { type: String, default: ''}
     }
 };
+const methods = UserNameRule.methods = {};
+methods.G_name = function() {
+    return this.name;
+};
 
 const coc = mgo.Load(['', UserNameRule]);
 
