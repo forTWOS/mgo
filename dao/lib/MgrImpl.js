@@ -290,6 +290,14 @@ class MgrImpl extends EventEmitter{
                     logger.warn('[MgrImpl.doCreateData] data key('+k+') undefined in rule.');
                 }
             }
+        } else {
+            for (let k in data) {
+                if (undefined !== rules[k]) {
+                    dataInstance[k] = data[k];
+                } else {
+                    logger.warn('[MgrImpl.doCreateData] data key('+k+') undefined in rule.');
+                }
+            }
         }
 
         let defaults = this.__RuleMap[key].GetDefaults();

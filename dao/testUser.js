@@ -48,7 +48,7 @@ class User {
         this.__data = undefined;
     }
     Create(cb) {
-        coc.Create({_id: ObjectId(this.__id), test: 10, desc:'test', banLogin: false}, (err, data) => {
+        coc.Create({_id: (this.__id), test: 10, desc:'test', banLogin: false, gold: 10000}, (err, data) => {
             if (err) {
                 logger('Create err: ', err);
                 cb(err);
@@ -65,8 +65,8 @@ class User {
                 cb(err);
                 return;
             }
-            // console.log(this.__data);
             this.__data = data;
+            console.log(this.__data);
             cb(null);
         });
     }
@@ -170,12 +170,14 @@ const p = new Promise(function(re, rj) {
     }, 300);
 }).then(() => {
     logger('=========login start');
-    user.Login((err) => {
-        logger('==========login stop');
-        if (err) {
-            return;
-        }
-    });
+    // setInterval(()=> {
+        user.Login((err) => {
+            logger('==========login stop');
+            if (err) {
+                return;
+            }
+        });
+    // }, 1000);
 },(err) => {
     logger('===============create failed');
     logger(err);

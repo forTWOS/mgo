@@ -80,6 +80,7 @@ class DbCoc {
             this.Create(obj, hb);
         });
     }
+    // Load接口，有走mgr数据缓存
     // 通过id，去mongodb库加载数据，并返回Data封装
     // 此处返回的接口，用于各业务模块数据操作
     Load(id, cb) {
@@ -313,9 +314,10 @@ class DbCoc {
 
         opts.timeout = 5000;//5秒超时
         opts.limit = 1;
+        opts.fields = filter;//mongodb3.1.1
 
-        // util.GetLogger().debug(find, filter, opts);
-        coc.find(find, filter, opts).next(cb);
+        // util.GetLogger().debug(find, opts);
+        coc.find(find, opts).next(cb);
     }
 
     ////////////////////////////////////
@@ -397,6 +399,7 @@ class DbCoc {
         }
 
         opts.timeout = 5000;//5秒超时
+        opts.fields = filter;//mongodb3.1.1
 
         /*
          var testForFields = {
@@ -407,7 +410,7 @@ class DbCoc {
           , noCursorTimeout: 1
         }
         * */
-        coc.find(find, filter, opts).toArray(cb);
+        coc.find(find, opts).toArray(cb);
     }
 
     ////////////////////////////////////

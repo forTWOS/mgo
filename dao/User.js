@@ -36,7 +36,7 @@ const signInfoRuleOpts = {
 const RuleOpts = {
     tableName: 'user',
     data: {
-        _id: {type: mgo.ObjectId}, // auto index
+        _id: {type: String},//mgo.ObjectId}, // auto index
         userName: {type: String, index: true/*||false||'unique'||'hashed'*/}, // 根结点，不用name-hook时，与class名冲突
         desc: {type: String, default: ''},
         tid: {type: mgo.ObjectId},

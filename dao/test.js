@@ -45,7 +45,7 @@ class User {
         this.__data = undefined;
     }
     Create(cb) {
-        coc.Create({_id: ObjectId(this.__id), test: 10, desc:'test', banLogin: false}, (err, data) => {
+        coc.Create({_id: (this.__id), test: 10, desc:'test', banLogin: false}, (err, data) => {
             if (err) {
                 logger('Create err: ', err);
                 cb(err);
