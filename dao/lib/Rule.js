@@ -120,6 +120,7 @@ class Rule {
         return this._tableName;
     }
 
+    // Check头函数，仅做检查，不可依赖其内其它功能(生产环境，关闭Check)
     // 按规则检测数据，并将异常数据初始化
     CheckPathAndReset(rule, data) {
         util.GetLogger().trace('[Rule.CheckPathAndReset] begin.', rule.type, typeof data);
@@ -352,7 +353,7 @@ class Rule {
             // 仅根结点
             // 不做object,array的索引
             if ('_id' === k) {
-                this._indexes[k] = {index: true};
+                this._indexes[k] = {index: 'unique'};
             } else {
                 this._indexes[k] = Rule._parseOpts_IndexCheckAndGet(k, tmpData);
             }
@@ -561,6 +562,9 @@ class Rule {
         const errorStr = '[Rule.parseOpts] err: data(' + k + ') type.default value(' + tmpData.default + ') invalid.';
         switch (dataType) {
             case String: {
+                if (k == '_id' && 'function' == defaultType) {
+                    break;
+                }
                 if ('string' !== defaultType) {
                     throw new Error(errorStr);
                 }

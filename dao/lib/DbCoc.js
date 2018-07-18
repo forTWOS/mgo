@@ -59,7 +59,7 @@ class DbCoc {
     Create(obj, cb) {
         let data = G_MgrImpl._mgr.CreateData([this.__dbName, this.__cocName], obj);
         if (null === data) {
-            util.GetLogger().warn('[DbCoc.Create] err: Create Data('+this.__dbName+','+this.__cocName+','+obj._id.toString()+') failed.');
+            util.GetLogger().warn('[DbCoc.Create] err: Create Data('+this.__dbName+','+this.__cocName+',id['+obj._id+']) failed.');
             cb(ErrCode.DbCoc.CreateDataError);
             return;
         }

@@ -40,16 +40,16 @@ class Db extends EventEmitter {
     constructor(dbName, mgr) {
         super();
         this.__dbName = dbName;
-        this._opts = mgr._opts;//因是初始化调用，G_MgrImpl在此处为{},不可使用
-        this._dbOpts = JSON.parse(JSON.stringify(DbOpts));//复制DbOpts
+        this.__opts = mgr._opts;//因是初始化调用，G_MgrImpl在此处为{},不可使用
+        this.__dbOpts = JSON.parse(JSON.stringify(DbOpts));//复制DbOpts
         // 设定连接参数
-        if (undefined !== this._opts._connOpts) {
-            for (let k in this._opts._connOpts) {
-                this._dbOpts[k] = this._opts._connOpts[k];
+        if (undefined !== this.__opts._connOpts) {
+            for (let k in this.__opts._connOpts) {
+                this.__dbOpts[k] = this.__opts._connOpts[k];
             }
         }
-        this._connStr = this._opts._connStr + this.__dbName;
-        this._status = Db_status.Uninited;
+        this.__connStr = this.__opts._connStr + this.__dbName;
+        this.__status = Db_status.Uninited;
         this.init();
     }
     // 返回coc
@@ -57,26 +57,29 @@ class Db extends EventEmitter {
         if (!this.IsOk()) {
             return undefined;
         }
-        return this._db.collection(cocName);
+        return this.__db.collection(cocName);
     }
     // 关闭Db
     Close() {
-        this._status = Db_status.Stopped;
-        this._db.close();
-        this._db = undefined;
+        this.__status = Db_status.Stopped;
+        // this.__db.close();
+        this.__db = undefined;
+        this.__client.close();
+        this.__client = undefined;
 
-        this._opts = undefined;
+        this.__opts = undefined;
     }
     IsOk() {
-        return Db_status.Connted == this._status;
+        return Db_status.Connted == this.__status;
     }
     IsStopped() {
-        return Db_status.Stopped == this._status;
+        return Db_status.Stopped == this.__status;
     }
     init() {
-        this._db = null;
+        this.__db = null;
+        this.__client = null;//mongodb3.1.1
         this.reconnect();
-        this._status = Db_status.Inited;
+        this.__status = Db_status.Inited;
     }
     // count连接次数
     reconnect(count) {
@@ -85,7 +88,7 @@ class Db extends EventEmitter {
         } else {
             util.GetLogger().info('[Db.reconnect] count:'+count);
         }
-        MongoClient.connect(this._connStr, this._dbOpts, (err, db) => {
+        MongoClient.connect(this.__connStr, this.__dbOpts, (err, client) => {
             if (err != null) {
                 if (count === DbFirstReconnectTries) {
                     process.nextTick(()=>{//不可放throw后，会不执行
@@ -100,9 +103,10 @@ class Db extends EventEmitter {
                 }
             }
 
-            this._db = db;
+            this.__client = client;
+            this.__db = this.__client.db(this.__dbName);
             this._dbHandler();
-            this._status = Db_status.Connted;
+            this.__status = Db_status.Connted;
             util.GetLogger().info('connected success.');
             G_MgrImpl._mgr.emit('connect');
             // this._test();
@@ -110,12 +114,12 @@ class Db extends EventEmitter {
     }
     //db连接事件绑定
     _dbHandler() {
-        this._db.on('error', this._onEvent('error'));
-        this._db.on('timeout', this._onEvent('timeout'));
-        this._db.on('close', this._onEvent('close'));
-        this._db.on('parseError', this._onEvent('parseError'));
-        this._db.on('reconnect', this._onEvent('reconnect'));
-        this._db.on('reconnectFailed', this._onEvent('reconnectFailed'));
+        this.__db.on('error', this._onEvent('error'));
+        this.__db.on('timeout', this._onEvent('timeout'));
+        this.__db.on('close', this._onEvent('close'));
+        this.__db.on('parseError', this._onEvent('parseError'));
+        this.__db.on('reconnect', this._onEvent('reconnect'));
+        this.__db.on('reconnectFailed', this._onEvent('reconnectFailed'));
     }
     _onEvent(eventStr, err) {
         return (err/*, db*/) => {
@@ -124,33 +128,33 @@ class Db extends EventEmitter {
             }
             switch(eventStr) {
                 case 'error': {
-                    this._status = Db_status.Error;
+                    this.__status = Db_status.Error;
                     break;
                 }
                 case 'timeout': {
-                    this._status = Db_status.Error;
+                    this.__status = Db_status.Error;
                     break;
                 }
                 case 'close': {
-                    this._status = Db_status.Close;
+                    this.__status = Db_status.Close;
                     break;
                 }
                 case 'parseError': {
-                    this._status = Db_status.Error;
+                    this.__status = Db_status.Error;
                     break;
                 }
                 case 'reconnect': {
-                    this._status = Db_status.Connted;
-                    // util.GetLogger().trace(err._privProp, this._db._privProp);// err此处err是db连接实例
+                    this.__status = Db_status.Connted;
+                    // util.GetLogger().trace(err._privProp, this.__db._privProp);// err此处err是db连接实例
                     // this._test();
                     break;
                 }
                 case 'reconnectFailed': {
-                    this._status = Db_status.Close;
+                    this.__status = Db_status.Close;
                     break;
                 }
             }
-            util.GetLogger().warn('[Db._onEvent] ', this._status, eventStr);
+            util.GetLogger().warn('[Db._onEvent] ', this.__status, eventStr);
             G_MgrImpl._mgr.emit(eventStr);//setTimeout(()=>{}, 2000);
             // util.GetLogger().trace(err);
         };
@@ -164,7 +168,7 @@ class Db extends EventEmitter {
     //     };
     // }
     // _test() {
-    //     this._db.collection('config').findOne(function(err, ...data) {
+    //     this.__db.collection('config').findOne(function(err, ...data) {
     //         util.GetLogger().trace(err);
     //         util.GetLogger().trace(...data);
     //     });

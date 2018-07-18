@@ -202,14 +202,14 @@ setTimeout(()=>{
     logger('catch: ', err);
 });
     }, 1000);
-return;
+// return;
 // 100ms/次操作，cpu无耗
 // 1ms-10ms/次操作，cpu1%
 // 100ms/100次操作,cpu1~2%: 1000次/秒
 // 10ms/100次操作,cpu6-10%: 1000次/秒
 setTimeout(()=>{
     setInterval(() => {
-        for(let i = 0; i < 100; ++i) {
+        for(let i = 0; i < 1; ++i) {
             // logger('create begin');
             let id = ObjectId().toString();
             // logger('id:%j', id);
@@ -223,7 +223,7 @@ setTimeout(()=>{
                 // logger('create succ');
             });
         }
-    }, 100);
+    }, 5000);
 }, 100);
 
 // }, 0);

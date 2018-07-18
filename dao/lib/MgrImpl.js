@@ -155,10 +155,10 @@ class MgrImpl extends EventEmitter{
         return dataInstance;
     }
     doCreateData([dbName, cocName, isCreated], data) {
-        // if (undefined === data._id) {// 若未设，将自动创建 Rule
-        //     logger.warn('[MgrImpl.doCreateData] err: data._id undefined.');
-        //     return null;
-        // }
+        if (undefined === data._id) {// 本套游戏方案中，需设定_id
+            logger.warn('[MgrImpl.doCreateData] err: data._id undefined.');
+            return null;
+        }
         let key = dbName + '/' + cocName;
         let id = data._id.toString();
         logger.trace('[MgrImpl.doCreateData] id:',id, typeof data._id);

@@ -3,6 +3,8 @@
  */
 const S_Mgr = require('./lib/Mgr');
 const S_Rule = require('./lib/Rule');
+const mongodb = require('mongodb'),
+    ObjectId = mongodb.ObjectId
 
 const initMgo = (dbOpts, logger) => {
     // const dbOpts = {
@@ -27,8 +29,14 @@ const initMgo = (dbOpts, logger) => {
     }
 };
 
+const IdString = () => { // 经测试，该函数可用
+    return ObjectId().toString();
+};
+
 module.exports = {
     initMgo: initMgo,
     S_Rule: S_Rule,
-    Load: S_Mgr.Load
+    Load: S_Mgr.Load,
+    IdString: IdString,
+    ObjectId: ObjectId
 };

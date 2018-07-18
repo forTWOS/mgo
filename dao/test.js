@@ -38,7 +38,7 @@ const coc = require('./User');
 // }catch(e) {
 //     throw e;
 // }
-return;
+
 class User {
     constructor(id) {
         this.__id = id;
