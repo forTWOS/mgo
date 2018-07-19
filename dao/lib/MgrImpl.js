@@ -84,7 +84,6 @@ class MgrImpl extends EventEmitter{
     IsStopped() {
         return this.__status == MgrImpl_stage.Stoped;
     }
-
     _loadRule(dataKey, rule) {
         if (undefined !== this.__RuleMap[dataKey]) {
             throw new Error('[MgrImpl.loadRule] rule('+dataKey+') duplicated.');
@@ -443,7 +442,6 @@ class MgrImpl extends EventEmitter{
         });
         this._startTick();
     }
-
     // 定时器
     _startTick() {
         logger.trace('_startTick: begin');

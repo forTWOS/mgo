@@ -2,11 +2,6 @@
 结构示意图：
 //////////////////////////////////////////////////////////////
 Mgr-MgrImpl:
-    -Init or constructor
-        -DbFactory
-        -DbCocFactory
-        -IRule
-    -Load
     -State:状态集
         -Uninited
         -Inited
@@ -25,6 +20,7 @@ Mgr-MgrImpl:
     -rDataMap(real data map):真实数据map{dbname/cocname:{_id:data}}
     -DataMap(Data from DataFactory): 数据抽象类
     -RuleMap:规则抽象类
+    -SDataMap:各表Data数据抽象类
 
 //////////////////////////////////////////////////////////////
 Db:连接抽象类

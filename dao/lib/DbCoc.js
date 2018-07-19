@@ -100,7 +100,7 @@ class DbCoc {
             cb(null, sdata);
             return;
         }
-        this.One({_id: ObjectId(id)}, cb);
+        this.One({_id: id}, cb);
     }
     // Page([page, pageSize], cb) {
     //     cb();
