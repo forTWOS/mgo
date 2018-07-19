@@ -444,7 +444,7 @@ class Statistic {
                         break;
                     }
                 }
-                this.__data.SetChange('items');
+                this.__data.__SetChange('items');
             // }
             // console.log(this.__data.items);
             this.Save();

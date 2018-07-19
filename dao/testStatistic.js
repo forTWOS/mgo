@@ -413,7 +413,7 @@ class Statistic {
         });
     }
     Save() {
-        this.__data.Save();
+        this.__data.__Save();
     }
     Gold_add(val, cb) {
         if (typeof val !== 'number') {
@@ -444,7 +444,7 @@ class Statistic {
                         break;
                     }
                 }
-                this.__data.SetChange('items');
+                this.__data.__SetChange('items');
             // }
             // console.log(this.__data.items);
             this.Save();
@@ -597,7 +597,7 @@ setTimeout(()=>{
             }
             logger('step2:', tmpids.length, ids.length);
             for(let i = 0; i < tmp.length; ++i) {
-                mgr.GetData('thcoc/statistic', tmp[i]).Stop();
+                mgr.GetData('thcoc/statistic', tmp[i]).__Stop();
             }
         }, 100);
     }, 200);

@@ -64,7 +64,7 @@ class DbCoc {
             return;
         }
         // util.GetLogger().trace(data);
-        data.Save();
+        data.__Save();
         // this.Insert(obj, cb);
         cb(ErrCode.Ok, data);
     }
@@ -93,8 +93,8 @@ class DbCoc {
             // ps:
             //   1.DbCoc.Load和Data.Stop,两操作之间，有10分钟间隔期
             //   2.为防在Data.Stop流程进行中，新增一个处理中队列__stopMsgMap_ing, 进行DbCoc.Load,在update处理时，等待处理完成，再移除DbCoc.__stopMsgMap_ing
-            if (sdata.IsStop()) {
-                sdata.SetStop(false);
+            if (sdata.__IsStop()) {
+                sdata.__SetStop(false);
             }
 
             cb(null, sdata);
@@ -178,14 +178,14 @@ class DbCoc {
             delete this.__saveMsgMap[id];
             --this.__saveMsgCount;
 
-            // 找到Data，并调用其DoSave(异步)
+            // 找到Data，并调用其__DoSave(异步)
             let sdata = G_MgrImpl._mgr.GetData(this.__key, id);
-            sdata.DoSave((errCode) => {
+            sdata.__DoSave((errCode) => {
                 // 容错处理
-                if (errCode || sdata.IsChanged() || sdata.IsCreated()) {
-                    sdata.Save(); // 重走保存流程
-                } else if (sdata.IsStop()) {//清理流程 有Data.isStop标志
-                    util.GetLogger().info('[DbCoc.doSave] clear Data:', id);// 重要处理，打印一下
+                if (errCode || sdata.__IsChanged() || sdata.__IsCreated()) {
+                    sdata.__Save(); // 重走保存流程
+                } else if (sdata.__IsStop()) {//清理流程 有Data.isStop标志
+                    util.GetLogger().info('[DbCoc.__DoSave] clear Data:', id);// 重要处理，打印一下
                     G_MgrImpl._mgr.RemoveData(this.__key, id);
                 }
                 if (--cn == 0) {

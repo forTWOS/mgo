@@ -64,9 +64,9 @@ class UserName {
     Save(cb) {
         logger('Save');
         if (!cb) {
-            this.__data.Save();
+            this.__data.__Save();
         } else {
-            this.__data.Save((err) => {
+            this.__data.__Save((err) => {
                 cb(err);
             });
         }

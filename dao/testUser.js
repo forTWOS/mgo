@@ -73,9 +73,9 @@ class User {
     Save(cb) {
         logger('[User.Save] begin');
         if (!cb) {
-            this.__data.Save();
+            this.__data.__Save();
         } else {
-            this.__data.Save((err) => {
+            this.__data.__Save((err) => {
                 cb(err);
             });
         }
@@ -94,7 +94,7 @@ class User {
         this.__data.oVal.sVal = 'test';
         // this.__data.oVal.subObj = {};
         // console.log(this.__data.oVal);
-        this.__data.SetChange('oVal');
+        this.__data.__SetChange('oVal');
         // console.log(this.__data.gold);
         this.Save();
         cb(null);
@@ -112,7 +112,7 @@ class User {
         this.__data.oVal.subObj = {};
         this.__data.oVal.subObj.way = '123';
         // console.log(this.__data.oVal);
-        this.__data.SetChange('oVal');
+        this.__data.__SetChange('oVal');
         // console.log(this.__data.gold);
         this.Save();
         cb(null);

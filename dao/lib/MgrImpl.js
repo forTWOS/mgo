@@ -117,7 +117,7 @@ class MgrImpl extends EventEmitter{
         // logger.trace(id, typeof id);
         // logger.trace(this.__DataMap);
         if (undefined === this.__DataMap[key] || undefined === this.__DataMap[key][id]) {
-            logger.warn('[MgrImpl.GetData] err: key('+key+'), id('+id+') empty.')
+            logger.debug('[MgrImpl.GetData] err: key('+key+'), id('+id+') empty.')
             return undefined;
         }
         return this.__DataMap[key][id];
@@ -202,7 +202,7 @@ class MgrImpl extends EventEmitter{
                         } else {
                             data[k] = rules[k].default;
                         }
-                        this.SetChange(k);
+                        this.__SetChange(k);
                         // this.__changedRoot[k] = 1; // this=> S_Data
                         // this.__changedRootExists = true;
                     }
@@ -262,7 +262,7 @@ class MgrImpl extends EventEmitter{
 
                     data[k] = v;
                     // if (k !== '_id') {//些处监听，仅能监测到“根结点数据赋值”,需辅以Data.SetChange函数
-                        this.SetChange(k);
+                        this.__SetChange(k);
                         // this.__changedRoot[k] = 1; // this=> S_Data
                         // this.__changedRootExists = true; // this=> S_Data
                     // }
