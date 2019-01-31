@@ -22,6 +22,7 @@ const testFloat = () => {
     let f1 = 192801.210213;
     let f2 = 90213854.92103983;
     let f3 = f1 + f2;
+	console.log(f3);
 };
 
 // 按位取反

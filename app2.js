@@ -27,7 +27,6 @@ var createLieten = function(tp, err, db) {
 MongoClient.connect(url, opts, function(err, db) {
     if (err != null) {
         throw new Error("connect mongodb error:" + err.toString() );
-        return;
     }
     console.log("connected success.");
     db.on('error', createLieten.bind(null, 'error'));

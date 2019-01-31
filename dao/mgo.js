@@ -22,11 +22,11 @@ const initMgo = (dbOpts, logger) => {
         logger: logger
     };
 
-    try {
+    // try {
         S_Mgr.Instance().Init(opts);
-    } catch (e) {
-        throw e;
-    }
+    // } catch (e) {
+    //     throw e;
+    // }
 };
 
 const IdString = () => { // 经测试，该函数可用
