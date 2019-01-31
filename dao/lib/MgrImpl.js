@@ -7,7 +7,7 @@ const EventEmitter = require('events').EventEmitter;
 const mongodb = require('mongodb'),
     ObjectId = mongodb.ObjectId;
 
-const G_MgrImpl = global.MgrImpl = {};//全局：当前为取_mgr
+const GMgrImpl = global.MgrImpl = {};//全局：当前为取_mgr
 
 const S_Db = require('./Db');//数据库连接封装
 const S_DbCoc = require('./DbCoc');//数据表封装
@@ -40,8 +40,8 @@ class MgrImpl extends EventEmitter{
         this.__status = MgrImpl_stage.Uninited;
         this.__nextStatePrint = 0;//下次状态打印时间
         this.__defaultDbName = undefined;// 默认dbName，取配置的第1个
-
-
+    }
+    Init(opts) {
         if (!this._parseArgs(opts)) {
             return;
         }
@@ -60,17 +60,10 @@ class MgrImpl extends EventEmitter{
         if (!dbName) {
             dbName = this.__defaultDbName;
         }
-        if (undefined === this.__DbMap[dbName]) {
-            throw new Error('[MgrImpl.Load] uninited dbName('+dbName+').');
-        }
+        // if (undefined === this.__DbMap[dbName]) {
+        //     throw new Error('[MgrImpl.Load] uninited dbName('+dbName+').');
+        // }
         let dataKey = dbName+'/'+cocName;
-        // if (undefined === this.__DbCocMap[dataKey]) {
-        //     this.__DbCocMap[dataKey] = {};
-        // }
-        // if (undefined !== this.__DbCocMap[dbName][cocName]) {
-        //     return this.__DbCocMap[dbName][cocName];
-        // }
-        // this.__status = MgrImpl_stage.Running;
 
         this.__SDataMap[dataKey] = MgrImpl._dataFactory(rule.GetMethods());
 
@@ -116,7 +109,7 @@ class MgrImpl extends EventEmitter{
         // logger.trace(id, typeof id);
         // logger.trace(this.__DataMap);
         if (undefined === this.__DataMap[key] || undefined === this.__DataMap[key][id]) {
-            logger.debug('[MgrImpl.GetData] err: key('+key+'), id('+id+') empty.')
+            logger.debug('[MgrImpl.GetData] err: key('+key+'), id('+id+') empty.');
             return undefined;
         }
         return this.__DataMap[key][id];
@@ -183,34 +176,34 @@ class MgrImpl extends EventEmitter{
             // console.log(k);//name
             Object.defineProperty(dataInstance, k, {
                 get: function() {
-                    // let data = this.__rDataMap[key][id];
-                    let data = G_MgrImpl._mgr.__rDataMap[key][id];
+                    // let rdata = this.__rDataMap[key][id];
+                    let rdata = GMgrImpl._mgr.__rDataMap[key][id];
                     // console.log(this);
                     logger.trace('[Data.getter] ' + k);
-                    if (undefined === data[k]) {
+                    if (undefined === rdata[k]) {
                         if (rules[k].type == 'object') {
-                            data[k] = {};
+                            rdata[k] = {};
                         } else if (rules[k].type == 'array') {
-                            data[k] = [];
+                            rdata[k] = [];
                         } else if (rules[k].default instanceof Function) {
                             if (rules[k].default === Date) {
-                                data[k] = new rules[k].default();
+                                rdata[k] = new rules[k].default();
                             } else {
-                                data[k] =rules[k].default();
+                                rdata[k] =rules[k].default();
                             }
                         } else {
-                            data[k] = rules[k].default;
+                            rdata[k] = rules[k].default;
                         }
                         this.__SetChange(k);
                         // this.__changedRoot[k] = 1; // this=> S_Data
                         // this.__changedRootExists = true;
                     }
-                    return data[k];
+                    return rdata[k];
                 },
                 set: function(v) {
                     logger.trace('[Data.setter] '+ k + ': '+v);
-                    // let data = this.__rDataMap[key][id];
-                    let data = G_MgrImpl._mgr.__rDataMap[key][id];
+                    // let rdata = this.__rDataMap[key][id];
+                    let rdata = GMgrImpl._mgr.__rDataMap[key][id];
                     // console.log(this);
 
                     // console.log(typeof v, rules[k].type);
@@ -219,51 +212,51 @@ class MgrImpl extends EventEmitter{
                         return;
                     }
                     logger.trace('[Data.setter] k:' +k +',', rules[k].type);
-                    switch(rules[k].type) {
-                        case 'array': {
-                            if (!(v instanceof Array)) {
-                                logger.warn('[MgrImpl.doCreateData] err: k('+k+') type(must be:array) invalid.');
-                                return;
-                            }
-                            break;
+                    switch (rules[k].type) {
+                    case 'array': {
+                        if (!(v instanceof Array)) {
+                            logger.warn('[MgrImpl.doCreateData] err: k('+k+') type(must be:array) invalid.');
+                            return;
                         }
-                        case 'ObjectId': {
-                            if (!(v instanceof ObjectId)) {
-                                logger.warn('[MgrImpl.doCreateData] err: k('+k+') type(must be:ObjectId) invalid.');
-                                return;
-                            }
-                            break;
+                        break;
+                    }
+                    case 'ObjectId': {
+                        if (!(v instanceof ObjectId)) {
+                            logger.warn('[MgrImpl.doCreateData] err: k('+k+') type(must be:ObjectId) invalid.');
+                            return;
                         }
-                        case 'object': {
-                            if (!(v instanceof Object)) {
-                                logger.warn('[MgrImpl.doCreateData] err: k('+k+') type(must be:object) invalid.');
-                                return;
-                            }
-                            break;
+                        break;
+                    }
+                    case 'object': {
+                        if (!(v instanceof Object)) {
+                            logger.warn('[MgrImpl.doCreateData] err: k('+k+') type(must be:object) invalid.');
+                            return;
                         }
-                        case 'date': {
-                            if (typeof v == 'number') {
-                                v = new Date(v);
-                            } else if (!(v instanceof Date)) {
-                                logger.warn('[MgrImpl.doCreateData] err: k('+k+') type(must be:Date or number) invalid.');
-                                return;
-                            }
-                            break;
+                        break;
+                    }
+                    case 'date': {
+                        if (typeof v == 'number') {
+                            v = new Date(v);
+                        } else if (!(v instanceof Date)) {
+                            logger.warn('[MgrImpl.doCreateData] err: k('+k+') type(must be:Date or number) invalid.');
+                            return;
                         }
-                        default: {
-                            if (typeof v != rules[k].type) {
-                                logger.warn('[MgrImpl.doCreateData] err: k('+k+') base type(must be:'+rules[k].type+') invalid.');
-                                return;
-                            }
-                            break;
+                        break;
+                    }
+                    default: {
+                        if (typeof v != rules[k].type) {
+                            logger.warn('[MgrImpl.doCreateData] err: k('+k+') base type(must be:'+rules[k].type+') invalid.');
+                            return;
                         }
+                        break;
+                    }
                     }
 
-                    data[k] = v;
+                    rdata[k] = v;
                     // if (k !== '_id') {//些处监听，仅能监测到“根结点数据赋值”,需辅以Data.SetChange函数
-                        this.__SetChange(k);
-                        // this.__changedRoot[k] = 1; // this=> S_Data
-                        // this.__changedRootExists = true; // this=> S_Data
+                    this.__SetChange(k);
+                    // this.__changedRoot[k] = 1; // this=> S_Data
+                    // this.__changedRootExists = true; // this=> S_Data
                     // }
                 }
             });
@@ -275,6 +268,7 @@ class MgrImpl extends EventEmitter{
         if (this.IsDebug()) {
             //数据类型检测
             const srules = this.__RuleMap[key];
+            let rdata = GMgrImpl._mgr.__rDataMap[key][id];
             for (let k in data) {
                 if (undefined !== rules[k]) {
                     if (!srules.CheckPath(k, data[k])) {
@@ -283,16 +277,25 @@ class MgrImpl extends EventEmitter{
                             dataInstance[k] = srules.CheckPathAndReset(rules[k], data[k]);
                         }
                     } else {
-                        dataInstance[k] = data[k];
+                        if (isCreated) {
+                            dataInstance[k] = data[k];
+                        } else {//非新创数据，直接初始化，不走Data映射流程
+                            rdata[k] = data[k];
+                        }
                     }
                 } else {
                     logger.warn('[MgrImpl.doCreateData] data key('+k+') undefined in rule.');
                 }
             }
         } else {
+            let rdata = GMgrImpl._mgr.__rDataMap[key][id];
             for (let k in data) {
                 if (undefined !== rules[k]) {
-                    dataInstance[k] = data[k];
+                    if (isCreated) {
+                        dataInstance[k] = data[k];
+                    } else {//非新创数据，直接初始化，不走Data映射流程
+                        rdata[k] = data[k];
+                    }
                 } else {
                     logger.warn('[MgrImpl.doCreateData] data key('+k+') undefined in rule.');
                 }
@@ -313,7 +316,7 @@ class MgrImpl extends EventEmitter{
         if (defaultsFunc) {
             for (let k in defaultsFunc) {
                 if (undefined === data[k]) {
-                    logger.info('[MgrImpl.doCreateData] setDefaultFunc for:' + k);
+                    logger.trace('[MgrImpl.doCreateData] setDefaultFunc for:' + k);
                     if (defaultsFunc[k] === Date) {
                         dataInstance[k] = new defaultsFunc[k]();
                     } else {
@@ -384,9 +387,9 @@ class MgrImpl extends EventEmitter{
         }
         const MeOpts = this._opts.db = {};
 
-        if (undefined === opts.databases
-            || !Array.isArray(opts.databases)
-            || opts.databases.length === 0
+        if (undefined === opts.databases ||
+            !Array.isArray(opts.databases) ||
+            opts.databases.length === 0
         ) {
             throw new Error('[MgrImpl.parseArgs] err: databasees.');
         }
@@ -396,8 +399,8 @@ class MgrImpl extends EventEmitter{
         MeOpts.databases = opts.databases;
 
         if (opts.auth) {
-            if (undefined === opts.user || '' === opts.user
-                || undefined === opts.password || '' === opts.password
+            if (undefined === opts.user || '' === opts.user ||
+                undefined === opts.password || '' === opts.password
             ) {
                 throw new Error('[MgrImpl.parseArgs] err: auth without user and password.');
             }
@@ -489,8 +492,8 @@ class MgrImpl extends EventEmitter{
     }
 
     static Instance(opts) {
-        if (null == MgrImpl._mgr) {
-            G_MgrImpl._mgr = MgrImpl._mgr = new MgrImpl(opts);
+        if (null === MgrImpl._mgr) {
+            GMgrImpl._mgr = MgrImpl._mgr = new MgrImpl(opts);
             MgrImpl._createListener();
         }
 
@@ -506,43 +509,46 @@ class MgrImpl extends EventEmitter{
         MgrImpl._mgr.on('reconnectFailed', MgrImpl._onEvent('reconnectFailed'));
     }
     static _onEvent(eventStr, err) {
-        return (err/*, db*/) => {
+        return (/*err, db*/) => {
             if (MgrImpl._mgr.IsStopped()) {
                 return;
             }
-            switch(eventStr) {
-                case 'connect': {
-                    MgrImpl._mgr.__status = MgrImpl_stage.Running;
-                    break;
-                }
-                case 'error': {
-                    // MgrImpl._mgr.__status = MgrImpl_stage.Error;
-                    break;
-                }
-                case 'timeout': {
-                    // MgrImpl._mgr.__status = Db_status.Error;
-                    break;
-                }
-                case 'close': {
-                    MgrImpl._mgr.__status = MgrImpl_stage.Error;
-                    break;
-                }
-                case 'parseError': {
-                    // MgrImpl._mgr.__status = Db_status.Error;
-                    break;
-                }
-                case 'reconnect': {
-                    MgrImpl._mgr.__status = MgrImpl_stage.Running;
-                    // logger.trace(err._privProp, this._db._privProp);// err此处err是db连接实例
-                    // this._test();
-                    break;
-                }
-                case 'reconnectFailed': {
-                    // MgrImpl._mgr.__status = Db_status.Close;
-                    break;
-                }
+            switch (eventStr) {
+            case 'connect': {
+                MgrImpl._mgr.__status = MgrImpl_stage.Running;
+                break;
             }
-            logger.trace('[MgrImpl._onEvent] ', MgrImpl._mgr._status, eventStr);
+            case 'error': {
+                // MgrImpl._mgr.__status = MgrImpl_stage.Error;
+                break;
+            }
+            case 'timeout': {
+                // MgrImpl._mgr.__status = Db_status.Error;
+                break;
+            }
+            case 'close': {
+                MgrImpl._mgr.__status = MgrImpl_stage.Error;
+                break;
+            }
+            case 'parseError': {
+                // MgrImpl._mgr.__status = Db_status.Error;
+                break;
+            }
+            case 'reconnect': {
+                MgrImpl._mgr.__status = MgrImpl_stage.Running;
+                // logger.trace(err._privProp, this._db._privProp);// err此处err是db连接实例
+                // this._test();
+                break;
+            }
+            case 'reconnectFailed': {
+                // MgrImpl._mgr.__status = Db_status.Close;
+                break;
+            }
+            default:{
+                break;
+            }
+            }
+            logger.trace('[MgrImpl._onEvent] eventStr:%j', MgrImpl._mgr._status, eventStr);
             // this.emit(err);
             // logger.trace(err);
         };

@@ -130,62 +130,62 @@ class Rule {
         util.GetLogger().trace('[Rule.CheckPathAndReset] begin.', rule.type, typeof data);
         let dataType = rule.type;
         switch (dataType) {
-            case 'string': {
-                if (dataType != typeof data) {
-                    return rule.default;
-                }
-                return data;
+        case 'string': {
+            if (dataType != typeof data) {
+                return rule.default;
             }
-            case 'number': {
-                if (dataType != typeof data) {
-                    return rule.default;
-                }
-                return data;
+            return data;
+        }
+        case 'number': {
+            if (dataType != typeof data) {
+                return rule.default;
             }
-            case 'boolean': {// true || false
-                if (dataType != typeof data) {
-                    return rule.default;
-                }
-                return data;
+            return data;
+        }
+        case 'boolean': {// true || false
+            if (dataType != typeof data) {
+                return rule.default;
             }
-            case 'date': { // Date || Date.now
-                if (dataType != typeof data) {
-                    if ('number' == typeof data) {
-                        return new Date(data);
-                    }
-                    return new Date();
+            return data;
+        }
+        case 'date': { // Date || Date.now
+            if (dataType != typeof data) {
+                if ('number' == typeof data) {
+                    return new Date(data);
                 }
-                return data;
+                return new Date();
             }
-            case 'ObjectId': {// ObjectId
-                if (!(data instanceof ObjectId)) {
-                    return rule.default();
+            return data;
+        }
+        case 'ObjectId': {// ObjectId
+            if (!(data instanceof ObjectId)) {
+                return rule.default();
+            }
+            return data;
+        }
+        case 'array': {
+            if (!(data instanceof Array)) {
+                return [];
+            }
+            for (let j = 0; j < data.length; ++j) {
+                if (undefined !== data[j]) {
+                    data[j] = this.CheckPathAndReset(rule.typeExt, data[j]);
                 }
-                return data;
             }
-            case 'array': {
-                if (!(data instanceof Array)) {
-                    return [];
+            return data;
+        }
+        case 'object': {
+            for (let k in rule.typeExt) {
+                if (undefined !== data[k]) {
+                    data[k] = this.CheckPathAndReset(rule.typeExt[k], data[k]);
                 }
-                for (let j = 0; j < data.length; ++j) {
-                    if (undefined !== data[j]) {
-                        data[j] = this.CheckPathAndReset(rule.typeExt, data[j]);
-                    }
-                }
-                return data;
             }
-            case 'object': {
-                for (let k in rule.typeExt) {
-                    if (undefined !== data[k]) {
-                        data[k] = this.CheckPathAndReset(rule.typeExt[k], data[k]);
-                    }
-                }
-                return data;
-            }
-            default: {
-                util.GetLogger().warn('[Rule.CheckPathAndReset] should not here.' + dataType);
-                break;
-            }
+            return data;
+        }
+        default: {
+            util.GetLogger().warn('[Rule.CheckPathAndReset] should not here.' + dataType);
+            break;
+        }
         }//switch(tmpData.type)
 
         return undefined;
@@ -213,46 +213,48 @@ class Rule {
         util.GetLogger().trace('[Rule._checkPath] begin need(' + rule.type + '), data('+ typeof data+')');
         let dataType = rule.type;
         switch (dataType) {
-            case 'string': {
-                return 'string' == typeof data;
+        case 'string': {
+            return 'string' == typeof data;
+        }
+        case 'number': {
+            return 'number' == typeof data;
+        }
+        case 'boolean': {// true || false
+            return 'boolean' == typeof data;
+        }
+        case 'date': { // Date || Date.now
+            return data instanceof Date;
+        }
+        case 'ObjectId': {// ObjectId
+            return data instanceof ObjectId;
+        }
+        case 'array': {
+            if (!(data instanceof Array)) {
+                return false;
             }
-            case 'number': {
-                return 'number' == typeof data;
-            }
-            case 'boolean': {// true || false
-                return 'boolean' == typeof data;
-            }
-            case 'date': { // Date || Date.now
-                console.log(rule, data, typeof data);
-                return data instanceof Date;
-            }
-            case 'ObjectId': {// ObjectId
-                return data instanceof ObjectId;
-            }
-            case 'array': {
-                if (!(data instanceof Array)) {
+            for (let j = 0; j < data.length; ++j) {
+                if (undefined !== data[j] && !this._checkPath(rule.typeExt, data[j])) {
                     return false;
                 }
-                for (let j = 0; j < data.length; ++j) {
-                    if (undefined !== data[j] && !this._checkPath(rule.typeExt, data[j])) {
-                        return false;
-                    }
+            }
+            break;
+        }
+        case 'object': {
+            if (!data) {
+                return false;
+            }
+            for (let k in rule.typeExt) {
+                if (undefined !== data[k] && !this._checkPath(rule.typeExt[k], data[k])) {
+                    util.GetLogger().warn('[Rule._checkPath] failed: '+k+',must('+ rule.typeExt[k].type + '),check failed.');
+                    return false;
                 }
-                break;
             }
-            case 'object': {
-                for (let k in rule.typeExt) {
-                    if (undefined !== data[k] && !this._checkPath(rule.typeExt[k], data[k])) {
-                        util.GetLogger().warn('[Rule._checkPath] failed: '+k+',must('+ rule.typeExt[k].type + '),check failed.');
-                        return false;
-                    }
-                }
-                break;
-            }
-            default: {
-                util.GetLogger().warn('[Rule._checkPath] should not here.');
-                break;
-            }
+            break;
+        }
+        default: {
+            util.GetLogger().warn('[Rule._checkPath] should not here.');
+            break;
+        }
         }//switch(tmpData.type)
 
         return true;
@@ -347,7 +349,7 @@ class Rule {
                     if (undefined === tmpDataType[k2].type) {
                         throw new Error('[Rule.parseOpts] err: data('+k+'.'+k2+') type isObject && type undefined.');
                     }
-                    this._rules[k]['typeExt'][k2] = this._parseOpts_typeCheckDo(k+'.'+k2, tmpDataType[k2].type, tmpData, 2);// 有可能object,array
+                    this._rules[k]['typeExt'][k2] = this._parseOpts_typeCheckDo(k+'.'+k2, tmpDataType[k2].type, tmpData[k2], 2);// 有可能object,array
                     // console.log(k, k2, this._rules[k][k2]);
                 }
                 continue;
@@ -371,8 +373,8 @@ class Rule {
     static _parseOpts_enumTypes(k, tmpType) {
         let exists = false;
         for (let i = 0, len = RuleDataType.length; i < len; ++i) {
-            if (tmpType === RuleDataType[i]
-                || (typeof tmpType !== 'function' && tmpType instanceof RuleDataType[i]) // 检测自定对象,数组
+            if (tmpType === RuleDataType[i] ||
+                (typeof tmpType !== 'function' && tmpType instanceof RuleDataType[i]) // 检测自定对象,数组
             ) {
                 exists = true;
                 break;
@@ -477,29 +479,29 @@ class Rule {
     // 将nodejs类型转为字串标识
     static _parseOpts_getTypeStr(dataType) {
         switch (dataType) {
-            case String: {
-                return 'string';
+        case String: {
+            return 'string';
+        }
+        case Number: {
+            return 'number';
+        }
+        case Boolean: {// true || false
+            return 'boolean';
+        }
+        case Date: { // Date || Date.now
+            return 'date';
+        }
+        case ObjectId: {// ObjectId
+            return 'ObjectId';
+        }
+        default: {
+            if (dataType instanceof Array) {
+                return 'array';
             }
-            case Number: {
-                return 'number';
+            if (dataType instanceof Object) {
+                return 'object';
             }
-            case Boolean: {// true || false
-                return 'boolean';
-            }
-            case Date: { // Date || Date.now
-                return 'date';
-            }
-            case ObjectId: {// ObjectId
-                return 'ObjectId';
-            }
-            default: {
-                if (dataType instanceof Array) {
-                    return 'array';
-                }
-                if (dataType instanceof Object) {
-                    return 'object';
-                }
-            }
+        }
         }//switch(tmpData.type)
         return 'undefined';// should not run here;
     }
@@ -510,19 +512,19 @@ class Rule {
     // mongodb不支持：hashed索引为unique
     static _parseOpts_IndexCheckAndGet(k, dataType) {
         if (!!dataType.index) {
-            switch(dataType.index) {
-                case true: {
-                    return {index: 1};
-                }
-                case 'hashed': {
-                    return {index: 'hashed'};
-                }
-                case 'unique': {
-                    return {index:1 ,unique: true};
-                }
-                default: {
-                    break;
-                }
+            switch (dataType.index) {
+            case true: {
+                return {index: 1};
+            }
+            case 'hashed': {
+                return {index: 'hashed'};
+            }
+            case 'unique': {
+                return {index:1 ,unique: true};
+            }
+            default: {
+                break;
+            }
             }
         }
         return false;
@@ -532,86 +534,85 @@ class Rule {
     // 未显式定义，设定相应默论值
     // object默认值{},array默认值[]
     static _parseOpts_DefaultCheckAndGet(k, dataType, tmpData) {
-        if (undefined === tmpData.default) {
+        if (undefined === tmpData || undefined === tmpData.default) {
             switch (dataType) {
-                case String: {
-                    return '';
-                }
-                case Number: {
-                    return 0;
-                }
-                case Boolean: {// true || false
-                    return false;
-                }
-                case Date: { // Date || Date.now
-                    return Date;
-                }
-                case ObjectId: {// ObjectId
-                    return ObjectId;
-                }
-                // case 'object': { // 在之前会处理设置
-                //     return {};
-                // }
-                default: {
-                    if (tmpData.type instanceof Array && 0 !== tmpData.type.length) {
-                        return [];
-                    }
-                    if (tmpData.type instanceof Object && 0 !== Object.keys(tmpData.type).length) {
-                        return {};
-                    }
-                    const errorStr = '[Rule.parseOpts] err: data(' + k + ') type.default value(' + tmpData.type + ') invalid.';
-                    throw new Error(errorStr);
-                }
-            }//switch(tmpData.type)
-            return;
-        }
-        const defaultType = typeof tmpData.default;
-        const errorStr = '[Rule.parseOpts] err: data(' + k + ') type.default value(' + tmpData.default + ') invalid.';
-        switch (dataType) {
             case String: {
-                if (k == '_id' && 'function' == defaultType) {
-                    break;
-                }
-                if ('string' !== defaultType) {
-                    throw new Error(errorStr);
-                }
-                break;
+                return '';
             }
             case Number: {
-                if ('number' !== defaultType) {
-                    throw new Error(errorStr);
-                }
-                break;
+                return 0;
             }
             case Boolean: {// true || false
-                if ('boolean' !== defaultType) {
-                    throw new Error(errorStr);
-                }
-                break;
+                return false;
             }
             case Date: { // Date || Date.now
                 return Date;
-                // if (!(tmpData.default === Date/* || tmpData.default === Date.now*/)) {
-                //     throw new Error(errorStr);
-                // }
-                // break;
             }
             case ObjectId: {// ObjectId
                 return ObjectId;
-                // if (tmpData.default !== ObjectId) {
-                //     throw new Error(errorStr);
-                // }
-                // break;
             }
+            // case 'object': { // 在之前会处理设置
+            //     return {};
+            // }
             default: {
                 if (tmpData.type instanceof Array && 0 !== tmpData.type.length) {
-                    break;
+                    return [];
                 }
                 if (tmpData.type instanceof Object && 0 !== Object.keys(tmpData.type).length) {
-                    break;
+                    return {};
                 }
+                const errorStr = '[Rule.parseOpts] _parseOpts_DefaultCheckAndGet err: data(' + k + ') type.default value(' + tmpData.type + ') invalid.';
                 throw new Error(errorStr);
             }
+            }//switch(tmpData.type)
+        }
+        const defaultType = typeof tmpData.default;
+        const errorStr = '[Rule.parseOpts] err: data(' + k + ',' + dataType + ') type.default value(' + tmpData.default + ',' + defaultType + ') invalid.';
+        switch (dataType) {
+        case String: {
+            if (k == '_id' && 'function' == defaultType) {
+                break;
+            }
+            if ('string' !== defaultType) {
+                throw new Error(errorStr);
+            }
+            break;
+        }
+        case Number: {
+            if ('number' !== defaultType) {
+                throw new Error(errorStr);
+            }
+            break;
+        }
+        case Boolean: {// true || false
+            if ('boolean' !== defaultType) {
+                throw new Error(errorStr);
+            }
+            break;
+        }
+        case Date: { // Date || Date.now
+            return Date;
+            // if (!(tmpData.default === Date/* || tmpData.default === Date.now*/)) {
+            //     throw new Error(errorStr);
+            // }
+            // break;
+        }
+        case ObjectId: {// ObjectId
+            return ObjectId;
+            // if (tmpData.default !== ObjectId) {
+            //     throw new Error(errorStr);
+            // }
+            // break;
+        }
+        default: {
+            if (tmpData.type instanceof Array && 0 !== tmpData.type.length) {
+                break;
+            }
+            if (tmpData.type instanceof Object && 0 !== Object.keys(tmpData.type).length) {
+                break;
+            }
+            throw new Error(errorStr);
+        }
         }//switch(tmpData.type)
         return tmpData.default;
     }

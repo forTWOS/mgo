@@ -8,11 +8,5 @@ let logger = {
     warn: console.log,// 发生逻辑错误-影响一条业务
     error: console.log,// 严重到需立即查明问题的情况-影响整个程序
 };
-logger = {
-    trace: ()=>{},
-    debug: ()=>{},
-    info: console.log, // 用于生产打印- 某些必要信息打印（系统状态、匹配状态）
-    warn: console.log,// 发生逻辑错误-影响一条业务
-    error: console.log,// 严重到需立即查明问题的情况-影响整个程序
-};
+logger = require('pomelo-logger').getLogger('userstate', __filename);
 module.exports = logger;

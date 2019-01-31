@@ -38,6 +38,7 @@ const logger = console.log;
 // logger(UserRule);
 // const coc = require('./lib/Mgr').Load(['', UserRule]);
 const coc = require('./User');
+console.log(coc);
 // }catch(e) {
 //     throw e;
 // }

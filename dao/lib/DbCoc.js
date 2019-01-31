@@ -9,11 +9,8 @@ const util = require('./util');
 
 const ErrCode = require('./ErrCode');
 
-const G_MgrImpl = global.MgrImpl;
+const GMgrImpl = global.MgrImpl;
 
-module.exports = (...args) => {
-    return new DbCoc(...args);
-};
 
 // 约有52个DbCoc
 // statistic服4个
@@ -39,7 +36,7 @@ class DbCoc {
         this.__statePrintTime = 0; // State输出间隔
     }
     State(now) {
-        if (this.__statePrintTime + 10000 > now) {
+        if (this.__statePrintTime + 60000 > now) {
             return;
         }
         this.__statePrintTime = now;
@@ -57,7 +54,7 @@ class DbCoc {
     // 1.创建内存Data-对传入obj做过滤
     // 2.将数据保存到mongodb库中
     Create(obj, cb) {
-        let data = G_MgrImpl._mgr.CreateData([this.__dbName, this.__cocName], obj);
+        let data = GMgrImpl._mgr.CreateData([this.__dbName, this.__cocName], obj);
         if (null === data) {
             util.GetLogger().warn('[DbCoc.Create] err: Create Data('+this.__dbName+','+this.__cocName+',id['+obj._id+']) failed.');
             cb(ErrCode.DbCoc.CreateDataError);
@@ -68,7 +65,7 @@ class DbCoc {
         // this.Insert(obj, cb);
         cb(ErrCode.Ok, data);
     }
-    CreateMore(objs, cb) {//todo:test
+    CreateMore(objs, cb) {
         let res = [];
         let hb = (err, data) => {
             res.push(err ? null : data);
@@ -84,7 +81,7 @@ class DbCoc {
     // 通过id，去mongodb库加载数据，并返回Data封装
     // 此处返回的接口，用于各业务模块数据操作
     Load(id, cb) {
-        let sdata = G_MgrImpl._mgr.GetData(this.__key, id);
+        let sdata = GMgrImpl._mgr.GetData(this.__key, id);
         // util.GetLogger().trace('[DbCoc.Load] sdata:', this.__key, id, sdata);
         if (undefined !== sdata) {
             // 此处目标: 中断Data.Stop流程
@@ -113,7 +110,7 @@ class DbCoc {
     // 强制保存id下的data全值
     // 无则创建
     SaveForce(id, cb) {
-        let data = G_MgrImpl._mgr.GetRData(this.__key, id);
+        let data = GMgrImpl._mgr.GetRData(this.__key, id);
         if (undefined === data) {
             let errStr = '[DbCoc.SaveForce] key('+this.__key+'.'+id+') data undefined.';
             util.GetLogger().trace(errStr);
@@ -124,7 +121,7 @@ class DbCoc {
     }
     doCreate(id, cb) {
         util.GetLogger().trace('[DbCoc.doCreate] begin.');
-        let data = G_MgrImpl._mgr.GetRData(this.__key, id);
+        let data = GMgrImpl._mgr.GetRData(this.__key, id);
         if (undefined === data) {
             let errStr = '[DbCoc.doCreate] key('+this.__key+'.'+id+') data undefined.';
             util.GetLogger().trace(errStr);
@@ -143,7 +140,10 @@ class DbCoc {
         }
 
         // 通过db连接，取真实mongodb库的collection接口
-        let db = G_MgrImpl._mgr.GetDb(this.__dbName);
+        let db = GMgrImpl._mgr.GetDb(this.__dbName);
+        if (!db) {
+            return null;
+        }
         this._coc = db.Coc(this.__cocName);
 
         return this._coc;
@@ -179,14 +179,14 @@ class DbCoc {
             --this.__saveMsgCount;
 
             // 找到Data，并调用其__DoSave(异步)
-            let sdata = G_MgrImpl._mgr.GetData(this.__key, id);
+            let sdata = GMgrImpl._mgr.GetData(this.__key, id);
             sdata.__DoSave((errCode) => {
                 // 容错处理
                 if (errCode || sdata.__IsChanged() || sdata.__IsCreated()) {
                     sdata.__Save(); // 重走保存流程
                 } else if (sdata.__IsStop()) {//清理流程 有Data.isStop标志
                     util.GetLogger().info('[DbCoc.__DoSave] clear Data:', id);// 重要处理，打印一下
-                    G_MgrImpl._mgr.RemoveData(this.__key, id);
+                    GMgrImpl._mgr.RemoveData(this.__key, id);
                 }
                 if (--cn == 0) {
                     this.__saveMsgMap_ing = false;
@@ -208,10 +208,10 @@ class DbCoc {
 
     // 给mongodb库的返回值，做Data封装
     addData(data) {
-        return G_MgrImpl._mgr.AddData([this.__dbName, this.__cocName], data);
+        return GMgrImpl._mgr.AddData([this.__dbName, this.__cocName], data);
     }
     addDatas(datas) {
-        return G_MgrImpl._mgr.AddDatas([this.__dbName, this.__cocName], datas);
+        return GMgrImpl._mgr.AddDatas([this.__dbName, this.__cocName], datas);
     }
 
     ////////////////////////////////////
@@ -255,7 +255,7 @@ class DbCoc {
                 cb(err);
                 return;
             }
-            if (data == null) {
+            if (!data) {
                 cb(null, undefined);
                 return;
             }
@@ -283,7 +283,7 @@ class DbCoc {
                 cb(err);
                 return;
             }
-            if (data == null) {
+            if (!data) {
                 cb(null, undefined);
                 return;
             }
@@ -345,12 +345,13 @@ class DbCoc {
             }
             if (!datas || datas.length == 0) {
                 cb(null, undefined);
+                return;
             }
 
             cb(null, this.addDatas(datas));
         });
     }
-    FindOriginal(find, filter, opts, cb) {
+    FindData(find, filter, opts, cb) {
         if (undefined === cb) {
             if (undefined === opts) {
                 cb = filter;
@@ -373,9 +374,10 @@ class DbCoc {
             }
             if (!datas || datas.length == 0) {
                 cb(null, undefined);
+                return;
             }
 
-            cb(null, this.addDatas(datas));
+            cb(null, datas);
         });
     }
     doFind(find, filter, opts, cb) {
@@ -438,6 +440,50 @@ class DbCoc {
             return;
         }
 
+        coc.update(find, set, opts, (err, res) => {
+            // res: {
+            // result: { n: 1, nModified: 1, ok: 1 },
+            // modifiedCount: 1,
+            // upsertedId: null,
+            // upsertedCount: 0,
+            // matchedCount: 1 }
+            if (err) {
+                util.GetLogger().error('update err:' + err.toString());
+                cb(err);
+                return;
+            }
+            if (!res.result.ok || (res.matchedCount != 1 && res.nModified != 1 && res.upsertedCount != 1)) {
+                util.GetLogger().warn('update err:' + res+', res.matchedCount:'+res.matchedCount+',res.upsertedCount:'+res.upsertedCount);
+                cb(ErrCode.DbCoc.DbProcessErr);
+                return;
+            }
+            // util.GetLogger().trace(res);
+            cb(null);
+        });
+    }
+    UpdateOne(find, set, opts, cb) {
+        if (undefined === find || undefined === set) {
+            util.GetLogger().warn('[DbCoc.Update] err: params invalid.');
+            cb(ErrCode.ParamsErr);
+            return;
+        }
+        if (undefined === cb) {
+            if (typeof opts === 'function') {
+                cb = opts;
+                opts = {};
+            }
+            if (undefined === cb) {
+                cb(ErrCode.ParamsErr);
+                return;
+            }
+        }
+
+        let coc = this.getCoc();
+        if (!coc) {
+            cb(ErrCode.DbCoc.CocNotExists);
+            return;
+        }
+
         coc.updateOne(find, set, opts, (err, res) => {
             // res: {
             // result: { n: 1, nModified: 1, ok: 1 },
@@ -446,11 +492,11 @@ class DbCoc {
             // upsertedCount: 0,
             // matchedCount: 1 }
             if (err) {
-                console.log('update err:' + err.toString());
+                util.GetLogger().error('update err:' + err.toString());
                 cb(err);
                 return;
             }
-            if (!res.result.ok || (res.matchedCount != 1 && res.upsertedCount != 1)) {
+            if (!res.result.ok || (res.matchedCount != 1 && res.nModified != 1 && res.upsertedCount != 1)) {
                 util.GetLogger().warn('update err:' + res+', res.matchedCount:'+res.matchedCount+',res.upsertedCount:'+res.upsertedCount);
                 cb(ErrCode.DbCoc.DbProcessErr);
                 return;
@@ -465,3 +511,7 @@ class DbCoc {
     //
     // }
 }
+
+module.exports = (...args) => {
+    return new DbCoc(...args);
+};

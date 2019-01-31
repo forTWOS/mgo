@@ -23,8 +23,8 @@ const initMgo = (dbOpts, logger) => {
     };
 
     try {
-        S_Mgr.CreateMgr(opts);
-    }catch(e) {
+        S_Mgr.Instance().Init(opts);
+    } catch (e) {
         throw e;
     }
 };

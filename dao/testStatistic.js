@@ -557,7 +557,7 @@ setTimeout(()=>{
         //         // logger('create succ');
         //     });
         // }
-        for (let i = 0; i < 50; ++i) {
+        for (let i = 0; i < 400; ++i) {
             // let tmp = G_objs[i];
             // tmp._id = ObjectId().toString();
             let tmp = JSON.parse(JSON.stringify(G_obj));
@@ -575,7 +575,7 @@ setTimeout(()=>{
         }
     }, 100);
 }, 100);
-
+// return;
 const limit = 60000;
 setTimeout(()=>{
     setInterval(()=>{

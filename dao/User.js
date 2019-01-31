@@ -49,7 +49,7 @@ const RuleOpts = {
         dateValDefaultNow: {type: Date, default: Date, index:'hashed'},
         nArray: {type: [Number]},//数组不设定默认值，程序会默认为[]
         bArray: {type: [Boolean]},
-        sArray: {type: [String]},
+        sArray: {type: [String], default: ''},
         dArray: {type: [Date]},
         oVal: {type: signInfoRuleOpts},
         oArray: {type: [signInfoRuleOpts]}

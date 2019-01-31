@@ -15,7 +15,7 @@ const Db_status = {
     'Close': 4,
     'Stopped': 5
 };
-const G_MgrImpl = global.MgrImpl;
+const GMgrImpl = global.MgrImpl;
 
 const DbOpts = {
     poolSize: 10,
@@ -32,15 +32,11 @@ DbOpts.ignoreUndefined = true; //Specify if the BSON serializer should ignore un
 //DbOpts.loggerLevel = 'debug';
 //DbOpts.logger = '';
 
-module.exports = function(...args) {
-    return new Db(...args);
-};
-
 class Db extends EventEmitter {
     constructor(dbName, mgr) {
         super();
         this.__dbName = dbName;
-        this.__opts = mgr._opts;//因是初始化调用，G_MgrImpl在此处为{},不可使用
+        this.__opts = mgr._opts;//因是初始化调用，GMgrImpl在此处为{},不可使用
         this.__dbOpts = JSON.parse(JSON.stringify(DbOpts));//复制DbOpts
         // 设定连接参数
         if (undefined !== this.__opts._connOpts) {
@@ -89,13 +85,13 @@ class Db extends EventEmitter {
             util.GetLogger().info('[Db.reconnect] count:'+count);
         }
         MongoClient.connect(this.__connStr, this.__dbOpts, (err, client) => {
-            if (err != null) {
+            if (err) {
                 if (count === DbFirstReconnectTries) {
                     process.nextTick(()=>{//不可放throw后，会不执行
                         util.GetLogger().error('[Db.reconnect] error: process.exit.');
                         process.exit();
                     });
-                    throw new Error("connect mongodb error:" + err.toString());
+                    throw new Error('connect mongodb error:' + err.toString());
                 } else {
                     util.GetLogger().error('[Db.reconnect] connect('+count+' mongodb error:' + err.toString());
                     this.reconnect(count+1);
@@ -108,7 +104,7 @@ class Db extends EventEmitter {
             this._dbHandler();
             this.__status = Db_status.Connted;
             util.GetLogger().info('connected success.');
-            G_MgrImpl._mgr.emit('connect');
+            GMgrImpl._mgr.emit('connect');
             // this._test();
         });
     }
@@ -122,40 +118,41 @@ class Db extends EventEmitter {
         this.__db.on('reconnectFailed', this._onEvent('reconnectFailed'));
     }
     _onEvent(eventStr, err) {
-        return (err/*, db*/) => {
+        return (/*err, db*/) => {
             if (this.IsStopped()) {
                 return;
             }
-            switch(eventStr) {
-                case 'error': {
-                    this.__status = Db_status.Error;
-                    break;
-                }
-                case 'timeout': {
-                    this.__status = Db_status.Error;
-                    break;
-                }
-                case 'close': {
-                    this.__status = Db_status.Close;
-                    break;
-                }
-                case 'parseError': {
-                    this.__status = Db_status.Error;
-                    break;
-                }
-                case 'reconnect': {
-                    this.__status = Db_status.Connted;
-                    // util.GetLogger().trace(err._privProp, this.__db._privProp);// err此处err是db连接实例
-                    // this._test();
-                    break;
-                }
-                case 'reconnectFailed': {
-                    this.__status = Db_status.Close;
-                    break;
-                }
+            switch (eventStr) {
+            case 'error': {
+                this.__status = Db_status.Error;
+                break;
+            }
+            case 'timeout': {
+                this.__status = Db_status.Error;
+                break;
+            }
+            case 'close': {
+                this.__status = Db_status.Close;
+                break;
+            }
+            case 'parseError': {
+                this.__status = Db_status.Error;
+                break;
+            }
+            case 'reconnect': {
+                this.__status = Db_status.Connted;
+                // util.GetLogger().trace(err._privProp, this.__db._privProp);// err此处err是db连接实例
+                // this._test();
+                break;
+            }
+            case 'reconnectFailed': {
+                this.__status = Db_status.Close;
+                break;
+            }
+            default: break;
             }
             util.GetLogger().warn('[Db._onEvent] ', this.__status, eventStr);
-            G_MgrImpl._mgr.emit(eventStr);//setTimeout(()=>{}, 2000);
+            GMgrImpl._mgr.emit(eventStr);//setTimeout(()=>{}, 2000);
             // util.GetLogger().trace(err);
         };
     }
@@ -174,3 +171,6 @@ class Db extends EventEmitter {
     //     });
     // }
 }
+module.exports = function(...args) {
+    return new Db(...args);
+};

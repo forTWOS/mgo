@@ -4,7 +4,7 @@
  * 所以：此文件中MgrImpl.Instance，需在MgrImpl完成后，再取值
  */
 const ErrCode = require('./ErrCode');
-const G_MgrImpl = global.MgrImpl;
+const GMgrImpl = global.MgrImpl;
 const util = require('./util');
 
 const LastErrorTimeLimit = 10000;
@@ -19,7 +19,7 @@ class Data{
 
         this.__changedRoot = {}; // 初始化改变列表
         this.__changedRootExists = false; // 标志：仅为运算方便
-        this.__changedRoot_ing = undefined; //在进行中的改变列表
+        this.__changedRooting = undefined; //在进行中的改变列表
         this.__isStop = false;//是否进行Data清理<<流程>>，归Data.Stop和DbCoc.Load修改
         this.__isCreated = false;//是否为新建数据
         this.__lastErrorTime = 0;//在db层操作返回错误后，记录时间，用于缓冲一段时间再操作
@@ -36,7 +36,7 @@ class Data{
         }
         if (!this.__IsChanged() && !this.__IsCreated() && !this.__isSaving()) {
             util.GetLogger().info('[Data.__Stop] clear Data:', this.__id);// 重要处理，打印一下
-            G_MgrImpl._mgr.RemoveData(this.__key, this.__id);
+            GMgrImpl._mgr.RemoveData(this.__key, this.__id);
             return;
         }
         this.__Save();
@@ -56,7 +56,7 @@ class Data{
         return this.__changedRootExists;
     }
     __isSaving() {
-        return undefined !== this.__changedRoot_ing;
+        return undefined !== this.__changedRooting;
     }
     __setLastErrorTime() {
         this.__lastErrorTime = Date.now() + LastErrorTimeLimit-1000;//时间错开，防止__Save处过滤掉该次__Save
@@ -79,15 +79,15 @@ class Data{
     //    1. gold
     //    2. face.front
     __SetChange(path) {
-        util.GetLogger().debug('[Data.__SetChange]  id('+this.__id+'), begin: ', path);
-        let tmp_path = this.__parsePath(path);
-        let rootKey = tmp_path[0];
-        if (0 == tmp_path.length /*|| '_id' == rootKey*/ || 'string' != typeof rootKey/* || undefined === this[rootKey]*/) {//空值或_id(不可变)或非string
+        util.GetLogger().debug('[Data.__SetChange]  id('+this.__id+'), begin: '+ path);
+        let tmpPath = this.__parsePath(path);
+        let rootKey = tmpPath[0];
+        if (0 == tmpPath.length /*|| '_id' == rootKey*/ || 'string' != typeof rootKey/* || undefined === this[rootKey]*/) {//空值或_id(不可变)或非string
             util.GetLogger().warn('[Data.__SetChange] err: id('+this.__id+'), path('+path+') invalid.');
             return ErrCode.Data.PathInvalid;
         }
 
-        if (G_MgrImpl._mgr.IsDebug() && !util.GetRule(this.__key).CheckPath(rootKey, this[rootKey])) {
+        if (GMgrImpl._mgr.IsDebug() && !util.GetRule(this.__key).CheckPath(rootKey, this[rootKey])) {
             util.GetLogger().warn('[Data.__SetChange] err: id('+this.__id+'), path('+path+') data check failed.');
             return ErrCode.Data.RuleCheckFailed;
         }
@@ -107,7 +107,7 @@ class Data{
         //无改变则不处理
         //操作正在进行中,等操作结束，进行触发
         if ((!this.__IsChanged() && !this.__IsCreated()) || this.__isSaving()) {
-            util.GetLogger().debug('[Data.__Save] id, !__IsChanged || __isSaving || !__IsCreated', this.__id, !this.__IsChanged(), this.__isSaving(), !this.__IsCreated());
+            util.GetLogger().debug('[Data.__Save] id[%s], !__IsChanged[%d] || !__IsCreated[%d] || __isSaving[%d]', this.__id, !this.__IsChanged(), !this.__IsCreated(), this.__isSaving());
             return;
         }
 
@@ -154,8 +154,8 @@ class Data{
             sets[k] = data[k];
         }
         // 备份当前保存root点
-        this.__changedRoot_ing = this.__changedRoot;
-        util.GetLogger().trace('[Data.__DoSave] ', this.__changedRoot_ing);
+        this.__changedRooting = this.__changedRoot;
+        util.GetLogger().trace('[Data.__DoSave] ', this.__changedRooting);
 
         // 清理标志
         this.__clearChangedRoot();
@@ -163,12 +163,12 @@ class Data{
         util.GetCoc(this.__key).Save(this.__idObj, sets, (err) => {
             util.GetLogger().debug('[Data.__DoSave] result:', this.__id, err);
             if (err) { // 存储失败，将改root还给__changeRoot
-                for (let k in this.__changedRoot_ing) {
-                    this.__changedRoot[k] = this.__changedRoot_ing[k];
+                for (let k in this.__changedRooting) {
+                    this.__changedRoot[k] = this.__changedRooting[k];
                 }
                 this.__setLastErrorTime();
             }
-            this.__changedRoot_ing = undefined;
+            this.__changedRooting = undefined;
             if (undefined !== cb) {
                 cb(err ? ErrCode.Data.SaveError: ErrCode.Ok, err);
             }
@@ -187,7 +187,7 @@ class Data{
     }
     __doCreate(cb) { //强制保存所有数据
         util.GetLogger().trace('[Data.__doCreate] begin.');
-        this.__changedRoot_ing = true;
+        this.__changedRooting = true;
         util.GetCoc(this.__key).doCreate(this.__idObj, (err) => {//DbCoc
             util.GetLogger().debug('[Data.__doCreate] result :', this.__id, err);
             if (err) { // 存储失败，将改root还给__changeRoot
@@ -196,7 +196,7 @@ class Data{
             } else {
                 this.__isCreated = false;
             }
-            this.__changedRoot_ing = undefined;
+            this.__changedRooting = undefined;
             if (undefined !== cb) {
                 cb(err ? ErrCode.Data.SaveError: ErrCode.Ok, err);
             }
@@ -210,20 +210,19 @@ class Data{
         if (typeof path != 'string') {
             return [];
         }
-        let ind = path.indexOf('.');
-        if (-1 == ind) { //根结点
+        if (-1 == path.indexOf('.')) { //根结点
             return [path];
         }
         const res = [];
-        let cur_ind = 0;
-        for (;cur_ind < path.length;) {
-            let ind = path.indexOf('.', cur_ind);
-            if (-1 == ind) {
-                res.push(path.substring(cur_ind));
+        let curInd = 0;
+        for (;curInd < path.length;) {
+            let pind = path.indexOf('.', curInd);
+            if (-1 == pind) {
+                res.push(path.substring(curInd));
                 break;
             }
-            res.push(path.substring(cur_ind, ind));
-            cur_ind = ind+1;
+            res.push(path.substring(curInd, pind));
+            curInd = pind+1;
         }
         return res;
     }
