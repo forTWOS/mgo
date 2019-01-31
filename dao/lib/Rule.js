@@ -51,24 +51,24 @@ const RuleDataType = [
     Array,//'function'
     Object,//'function'
 ];
-const RuleDataTypeStr = [
-    'ObjectId',
-    'boolean',
-    'number',
-    'string',
-    'date',
-    'array',
-    'object',
-];
-const RuleDataDefault = [
-    ObjectId,// ObjectId,//程序限定，默认值为ObjectId函数
-    false,// Boolean,
-    0,// Number,
-    '',// String,
-    Date,//Date.now,//程序限定，默认值为Date函数
-    [],// Array,
-    {},// Object,
-];
+// const RuleDataTypeStr = [
+//     'ObjectId',
+//     'boolean',
+//     'number',
+//     'string',
+//     'date',
+//     'array',
+//     'object',
+// ];
+// const RuleDataDefault = [
+//     ObjectId,// ObjectId,//程序限定，默认值为ObjectId函数
+//     false,// Boolean,
+//     0,// Number,
+//     '',// String,
+//     Date,//Date.now,//程序限定，默认值为Date函数
+//     [],// Array,
+//     {},// Object,
+// ];
 
 const RuleDeepLimit = 5;
 

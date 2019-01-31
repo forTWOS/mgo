@@ -3,8 +3,8 @@
  * mongodb原生coc表接口的封装，用于做相关数据操作:表处理、数据封装
  * 1个表==1个DbCoc
  */
-const mongodb = require('mongodb'),
-    ObjectId = mongodb.ObjectId;
+const mongodb = require('mongodb');//,
+    // ObjectId = mongodb.ObjectId;
 const util = require('./util');
 
 const ErrCode = require('./ErrCode');
@@ -17,7 +17,7 @@ const GMgrImpl = global.MgrImpl;
 // auth服3个
 // userstate服45个
 // 防止腾讯mongodb传输限制，设小值
-const DbCoc_saveLimit = 20;// 1DbCoc, 20人/100ms==200人/秒
+// const DbCoc_saveLimit = 20;// 1DbCoc, 20人/100ms==200人/秒
 
 // CRUD操作
 class DbCoc {
@@ -429,7 +429,8 @@ class DbCoc {
                 opts = {};
             }
             if (undefined === cb) {
-                cb(ErrCode.ParamsErr);
+                util.GetLogger().warn('[DbCoc.Update] err: cb invalid.');
+                // cb(ErrCode.ParamsErr);
                 return;
             }
         }
@@ -463,7 +464,7 @@ class DbCoc {
     }
     UpdateOne(find, set, opts, cb) {
         if (undefined === find || undefined === set) {
-            util.GetLogger().warn('[DbCoc.Update] err: params invalid.');
+            util.GetLogger().warn('[DbCoc.UpdateOne] err: params invalid.');
             cb(ErrCode.ParamsErr);
             return;
         }
@@ -473,7 +474,8 @@ class DbCoc {
                 opts = {};
             }
             if (undefined === cb) {
-                cb(ErrCode.ParamsErr);
+                util.GetLogger().warn('[DbCoc.UpdateOne] err: cb invalid.');
+                // cb(ErrCode.ParamsErr);
                 return;
             }
         }
