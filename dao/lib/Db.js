@@ -36,7 +36,7 @@ class Db extends EventEmitter {
     constructor(dbName, mgr) {
         super();
         this.__dbName = dbName;
-        this.__opts = mgr._opts;//因是初始化调用，GMgrImpl在此处为{},不可使用
+        this.__opts = mgr.__opts;//因是初始化调用，GMgrImpl在此处为{},不可使用
         this.__dbOpts = JSON.parse(JSON.stringify(DbOpts));//复制DbOpts
         // 设定连接参数
         if (undefined !== this.__opts._connOpts) {
@@ -51,7 +51,7 @@ class Db extends EventEmitter {
     // 返回coc
     Coc(cocName) {
         if (!this.IsOk()) {
-            return undefined;
+            return null;
         }
         return this.__db.collection(cocName);
     }
@@ -59,11 +59,11 @@ class Db extends EventEmitter {
     Close() {
         this.__status = Db_status.Stopped;
         // this.__db.close();
-        this.__db = undefined;
+        this.__db = null;
         this.__client.close();
-        this.__client = undefined;
+        this.__client = null;
 
-        this.__opts = undefined;
+        this.__opts = null;
     }
     IsOk() {
         return Db_status.Connted == this.__status;
@@ -84,6 +84,7 @@ class Db extends EventEmitter {
         } else {
             util.GetLogger().info('[Db.reconnect] count:'+count);
         }
+        util.GetLogger().debug('[Db.reconnect] __connStr:%j, __dbOpts:%j.' , this.__connStr, this.__dbOpts);
         MongoClient.connect(this.__connStr, this.__dbOpts, (err, client) => {
             if (err) {
                 if (count === DbFirstReconnectTries) {
@@ -104,7 +105,7 @@ class Db extends EventEmitter {
             this._dbHandler();
             this.__status = Db_status.Connted;
             util.GetLogger().info('connected success.');
-            GMgrImpl._mgr.emit('connect');
+            GMgrImpl._mgr.emit('connect', null, this.__dbName);
             // this._test();
         });
     }

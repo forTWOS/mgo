@@ -7,7 +7,7 @@ const EventEmitter = require('events').EventEmitter;
 const mongodb = require('mongodb'),
     ObjectId = mongodb.ObjectId;
 
-const GMgrImpl = global.MgrImpl = {};//全局：当前为取_mgr
+const GMgrImpl = global.MgrImpl = {_mgr: null};//全局：当前为取_mgr
 
 const S_Db = require('./Db');//数据库连接封装
 const S_DbCoc = require('./DbCoc');//数据表封装
@@ -27,58 +27,209 @@ class MgrImpl extends EventEmitter{
     constructor(opts) {
         super();
 
-        this.__DbMap = {};
-        this.__DbCocMap = {};
-        this.__rDataMap = {};
-        this.__DataMap = {};
-        this.__RuleMap = {}; // coname: Rule
-        this.__SDataMap = {}; // 各表Data类,主要实现methods功能
-        // this.DataTemplateMap = {};// 继承自Data，根据rule规则生成有hook的各表模板
-        // this.Event =
-        // this.__MsgMap = {};// {dbName+cocName: 1}//消息队列，用于定时在触发DbCoc的真实操作;添加流程:Data.Save->DbCoc.AddMsg->MgrImpl.AddMsg
-        this.__tickT = undefined;// 定时器句柄
+        this.__app = null;
+        this.__opts = {
+            env: 'development',
+            IsDebug: true,
+            db: {
+                host: '127.0.0.1',
+                port: 27017,
+                databases: []
+            },
+            _connStr: '',
+            _connOpts: {
+                useNewUrlParser: true,
+                mongos: false,
+                authMechanism: 'SCRAM-SHA-1',
+                authSource: 'admin'
+            }
+
+        };
+        this.__DbConnected = new Set(); // 记录Db是否已连接上
+        this.__DbMap = new Map();
+        this.__DbCocMap = new Map();
+        this.__rDataMap = new Map();
+        this.__DataMap = new Map();
+        this.__RuleMap = new Map(); // coname: Rule
+        this.__inited_dbCocIndexes = new Set();
+        this.__SDataMap = new Map(); // 各表Data类,主要实现methods功能
+        // this.DataTemplateMap = new Map();// 继承自Data，根据rule规则生成有hook的各表模板
+        this.__tickT = null;// 定时器句柄
         this.__status = MgrImpl_stage.Uninited;
         this.__nextStatePrint = 0;//下次状态打印时间
-        this.__defaultDbName = undefined;// 默认dbName，取配置的第1个
+        this.__defaultDbName = null;// 默认dbName，取配置的第1个
+        this.__inited = false;
+        this.__delayLoad = new Set();
+        this.__inited_dbCocMap = new Set(); // 是否将实例(DbCoc)添加上自定义函数
+        this.__tableNameUnique = new Set();
     }
     Init(opts) {
         if (!this._parseArgs(opts)) {
             return;
         }
+        this.__app = opts.app;
         this._init();
 
         this.__status = MgrImpl_stage.Inited;
+        this.__inited = true;
+
+        this._afterInit();
+    }
+    _afterInit() {
+        if (this.__delayLoad.size > 0) {
+            const mgoLoadTables = this.__app.get('mgoLoadTables');
+            const mgoUnLoadTables = this.__app.get('mgoUnLoadTables');
+            if (mgoLoadTables && mgoLoadTables != '*') {
+                this.__delayLoad.forEach(([dbName, cocName]) => {
+                    if (-1 === mgoLoadTables.indexOf(cocName)) {
+                        logger.info('[MgrImpl] not allow table[%j] access, tables:%j.', cocName, mgoLoadTables);
+                        this.UnLoad([dbName, cocName]);
+                    }
+                });
+            }
+            if (mgoUnLoadTables) {
+                this.__delayLoad.forEach(([dbName, cocName]) => {
+                    if (-1 !== mgoUnLoadTables.indexOf(cocName)) {
+                        logger.info('[MgrImpl] not allow table[%j] access, unloadTables:%j.', cocName, mgoUnLoadTables);
+                        this.UnLoad([dbName, cocName]);
+                    }
+                });
+            }
+        }
     }
     // return DbCoc=>数据操作
     Load([dbName, ruleOpts]) { // 做成无阻塞的接口，在require初始化
-        const rule = S_Rule(ruleOpts);//规则化-检测
+        if (this.__tableNameUnique.has(dbName+'_'+ruleOpts.tableName)) {
+            return;
+        }
+        this.__tableNameUnique.add(dbName+'_'+ruleOpts.tableName);
+        const rule = S_Rule(dbName, ruleOpts);//规则化-检测
 
         let cocName = rule.GetTableName();
-        if (undefined === cocName) {
+        if (!cocName) {
             throw new Error('[MgrImpl.Load] invalid params.');
         }
+
+        if (!this.__inited) {
+            this.__delayLoad.add([dbName, cocName]);
+        } else {
+            const mgoLoadTables = this.__app.get('mgoLoadTables');
+            const mgoUnLoadTables = this.__app.get('mgoUnLoadTables');
+            if ((mgoLoadTables && mgoLoadTables != '*' && -1 === mgoLoadTables.indexOf(cocName)) || (mgoUnLoadTables && -1 !== mgoUnLoadTables.indexOf(cocName))) {
+                logger.info('[MgrImpl] not allow table[%j] access, tables:%j, unloadTables:%j.', cocName, mgoLoadTables, mgoUnLoadTables);
+                return;
+            }
+        }
+
         if (!dbName) {
             dbName = this.__defaultDbName;
         }
-        // if (undefined === this.__DbMap[dbName]) {
-        //     throw new Error('[MgrImpl.Load] uninited dbName('+dbName+').');
-        // }
-        let dataKey = dbName+'/'+cocName;
 
-        this.__SDataMap[dataKey] = MgrImpl._dataFactory(rule.GetMethods());
+        let dataKey = MgrImpl.GenDataKey([dbName, cocName]);
 
-        this.__DbCocMap[dataKey] = S_DbCoc([dbName, cocName]);
-        this.__rDataMap[dataKey] = {};
-        this.__DataMap[dataKey] = {};
+        this.__SDataMap.set(dataKey, MgrImpl._dataFactory(rule.GetMethods()));
+
+        this.__DbCocMap.set(dataKey, S_DbCoc([dbName, cocName]));
+        this.__rDataMap.set(dataKey, new Map());
+        this.__DataMap.set(dataKey, new Map());
         this._loadRule(dataKey, rule);
-        return this.__DbCocMap[dataKey];
+        this._initDbCocMap();
+        this._initIndex();
+        return this.__DbCocMap.get(dataKey);
+    }
+
+    _initIndex() {
+        if (this.__status !== MgrImpl_stage.Running) {
+            return;
+        }
+        // 处理索引流程
+        for (let [dataKey, rule] of this.__RuleMap) {
+            if (this.__inited_dbCocIndexes.has(dataKey) || !this.__DbMap.has(rule.GetDbName())) {
+                continue;
+            }
+            this.__inited_dbCocIndexes.add(dataKey);
+
+            let indexes = rule.GetIndexes();
+            if (indexes.size == 0) {
+                continue;
+            }
+
+            let db = this.__DbMap.get(rule.GetDbName());
+            let coc = db.Coc(rule.GetTableName());
+            if (!coc) {
+                throw new Error('[MgrImpl._initIndex] db.coc['+rule.GetDbName()+':'+rule.GetTableName()+'] fetch collection err.');
+            }
+            coc.indexInformation((code, info) => {
+                let indexesExist = new Set();
+                if (!code) {
+                    for (let k in info) {
+                        indexesExist.add(k);
+                    }
+                }
+                let createIndexes = [];
+                for (let [k, ruleIndexes] of indexes) {
+                    if (indexesExist.has(k)) {
+                        continue;
+                    }
+
+                    if (Array.isArray(ruleIndexes)) {
+                        //复合索引
+                        let opts = {};
+                        for (let i = 0; i < ruleIndexes.length; ++i) {
+                            opts[ruleIndexes[i]] = 1;
+                        }
+                        createIndexes.push({key: opts, name: k});
+                    } else if (ruleIndexes.index) {
+                        //单一索引
+                        let opts = {};
+                        opts[k] = ruleIndexes.index;
+                        let uniqueValue = !!ruleIndexes.unique;
+                        createIndexes.push({key: opts, name: k, unique: uniqueValue});
+                    }
+                }
+                if (createIndexes.length > 0) {
+                    coc.createIndexes(createIndexes);
+                }
+            });
+        }
+    }
+
+    _initDbCocMap() {
+        // logger.debug('[MgrImpl] _initDbCocMap');
+        for (let [dataKey, coc] of this.__DbCocMap) {
+            if (!!this.__inited_dbCocMap.has(dataKey)) {
+                continue;
+            }
+            this.__inited_dbCocMap.add(dataKey);
+
+            let rule = this.GetRule(dataKey);
+            for (let [method, fn] of rule.GetGMethods()) {
+                // logger.debug('[MgrImpl] _initDbCocMap:%j, %j', dataKey, method);
+                coc[method] = fn.bind(coc);
+            }
+        }
+    }
+
+    static GenDataKey([dbName, cocName]) {
+        let dataKey = dbName+'/'+cocName;
+        Number(dataKey);
+        return dataKey;
+    }
+    UnLoad([dbName, cocName]) {
+        logger.info('[MgrImpl] UnLoad db[%j], table[%j] access.', dbName, cocName);
+        let dataKey = MgrImpl.GenDataKey([dbName, cocName]);
+        this.__SDataMap.delete(dataKey);
+        this.__DbCocMap.delete(dataKey);
+        this.__rDataMap.delete(dataKey);
+        this.__DataMap.delete(dataKey);
+        this.__RuleMap.delete(dataKey);
     }
 
     IsStopped() {
         return this.__status == MgrImpl_stage.Stoped;
     }
     _loadRule(dataKey, rule) {
-        if (undefined !== this.__RuleMap[dataKey]) {
+        if (this.__RuleMap.has(dataKey)) {
             throw new Error('[MgrImpl.loadRule] rule('+dataKey+') duplicated.');
         }
 
@@ -96,11 +247,11 @@ class MgrImpl extends EventEmitter{
         //     }
         // };
 
-        this.__RuleMap[dataKey] = rule;
+        this.__RuleMap.set(dataKey, rule);
         // this.DataTemplateMap[dataKey] = tmpClass;
     }
     GetRule(dataKey) {
-        return this.__RuleMap[dataKey];
+        return this.__RuleMap.get(dataKey);
     }
 
     // 用于映射真实数据
@@ -108,33 +259,31 @@ class MgrImpl extends EventEmitter{
     GetData(key, id) {
         // logger.trace(id, typeof id);
         // logger.trace(this.__DataMap);
-        if (undefined === this.__DataMap[key] || undefined === this.__DataMap[key][id]) {
+        if (!this.__DataMap.has(key) || !this.__DataMap.get(key).has(id)) {
             logger.debug('[MgrImpl.GetData] err: key('+key+'), id('+id+') empty.');
             return undefined;
         }
-        return this.__DataMap[key][id];
+        return this.__DataMap.get(key).get(id);
     }
     RemoveData(key, id) {
-        if (undefined === this.__DataMap[key] || undefined === this.__DataMap[key][id]) {
+        if (!this.__DataMap.has(key) || !this.__DataMap.get(key).has(id)) {
             logger.warn('[MgrImpl.RemoveData] err: key('+key+'), id('+id+') not exists.');
             return;
         }
-        this.__DataMap[key][id] = undefined;
-        delete this.__DataMap[key][id];
-        this.__rDataMap[key][id] = undefined;
-        delete this.__rDataMap[key][id];
+        this.__DataMap.get(key).delete(id);
+        this.__rDataMap.get(key).delete(id);
     }
     GetRData(key, id) {
-        if (undefined === this.__rDataMap[key] || undefined === this.__rDataMap[key][id]) {
+        if (!this.__rDataMap.has(key) || !this.__rDataMap.get(key).has(id)) {
             return undefined;
         }
-        return this.__rDataMap[key][id];
+        return this.__rDataMap.get(key).get(id);
     }
     GetDbCoc(key) {
-        return this.__DbCocMap[key];
+        return this.__DbCocMap.get(key);
     }
     GetDb(dbName) {
-        return this.__DbMap[dbName];
+        return this.__DbMap.get(dbName);
     }
 
     //DbCoc真实数据封装接口
@@ -150,69 +299,71 @@ class MgrImpl extends EventEmitter{
         return dataInstance;
     }
     doCreateData([dbName, cocName, isCreated], data) {
+        let key = dbName + '/' + cocName;
         if (undefined === data._id) {// 本套游戏方案中，需设定_id
-            logger.warn('[MgrImpl.doCreateData] err: data._id undefined.');
+            logger.warn('[MgrImpl.doCreateData] key:%j, err: data._id undefined.', key);
             return null;
         }
-        let key = dbName + '/' + cocName;
-        let id = data._id.toString();
-        logger.trace('[MgrImpl.doCreateData] id:',id, typeof data._id);
-        if (undefined !== this.__DataMap[key][id]) {
-            logger.warn('[MgrImpl.doCreateData] err: data._id('+id+') duplicate.');
-            return this.__DataMap[key][id];
+        if (!this.__DataMap.has(key)) {
+            logger.error('[MgrImpl.doCreateData] key:%j __DataMap not inited.', key)
+            return;
         }
 
-        const rules = this.__RuleMap[key].GetRules();
+        let id = data._id.toString();
+        logger.trace('[MgrImpl.doCreateData] id:',id, typeof data._id);
+        if (this.__DataMap.get(key).has(id)) {
+            logger.warn('[MgrImpl.doCreateData] err: data._id('+id+') duplicate.');
+            return this.__DataMap.get(key).get(id);
+        }
 
-        this.__rDataMap[key][id] = {};
-        // logger.trace("__rDataMap size:", Object.keys(this.__rDataMap[key]).length);
-        let SubData = this.__SDataMap[key];
-        this.__DataMap[key][id] = new SubData([dbName, cocName], id, data._id);
-        const dataInstance = this.__DataMap[key][id];
+        const rules = this.__RuleMap.get(key).GetRules();
+
+        let idData = {};
+        this.__rDataMap.get(key).set(id, idData);
+        // logger.trace("__rDataMap size:", this.__rDataMap.get(key).size);
+        let SubData = this.__SDataMap.get(key);
+        let dataInstance = new SubData([dbName, cocName], id, data._id);
+        this.__DataMap.get(key).set(id, dataInstance);
 
         // console.log(data);
         // 第一种使用hook函数，cpu无波动
-        for (let k in rules) {
+        for (let [k, rule] of rules) {
             // console.log(k);//name
-            Object.defineProperty(dataInstance, k, {
+            Object.defineProperty(dataInstance, k, {//todo 优化写法
                 get: function() {
-                    // let rdata = this.__rDataMap[key][id];
-                    let rdata = GMgrImpl._mgr.__rDataMap[key][id];
-                    // console.log(this);
+                    let rdata = GMgrImpl._mgr.__rDataMap.get(key).get(id);
+                    // console.log(rdata);
                     logger.trace('[Data.getter] ' + k);
                     if (undefined === rdata[k]) {
-                        if (rules[k].type == 'object') {
+                        if (rule.type == 'object') {
                             rdata[k] = {};
-                        } else if (rules[k].type == 'array') {
+                        } else if (rule.type == 'array') {
                             rdata[k] = [];
-                        } else if (rules[k].default instanceof Function) {
-                            if (rules[k].default === Date) {
-                                rdata[k] = new rules[k].default();
+                        } else if (rule.default instanceof Function) {
+                            if (rule.default === Date) {
+                                rdata[k] = new rule.default();
                             } else {
-                                rdata[k] =rules[k].default();
+                                rdata[k] = rule.default();
                             }
                         } else {
-                            rdata[k] = rules[k].default;
+                            rdata[k] = rule.default;
                         }
                         this.__SetChange(k);
-                        // this.__changedRoot[k] = 1; // this=> S_Data
-                        // this.__changedRootExists = true;
                     }
                     return rdata[k];
                 },
                 set: function(v) {
                     logger.trace('[Data.setter] '+ k + ': '+v);
-                    // let rdata = this.__rDataMap[key][id];
-                    let rdata = GMgrImpl._mgr.__rDataMap[key][id];
-                    // console.log(this);
+                    let rdata = GMgrImpl._mgr.__rDataMap.get(key).get(id);
+                    // console.log(rdata);
 
-                    // console.log(typeof v, rules[k].type);
+                    // console.log(typeof v, rule.type);
                     if ('function' === typeof v) {
-                        logger.warn('[MgrImpl.doCreateData] err: k('+k+') type(must be:'+rules[k].type+') invalid.');
+                        logger.warn('[MgrImpl.doCreateData] err: k('+k+') type(must be:'+rule.type+') invalid.');
                         return;
                     }
-                    logger.trace('[Data.setter] k:' +k +',', rules[k].type);
-                    switch (rules[k].type) {
+                    logger.trace('[Data.setter] k:' +k +',', rule.type);
+                    switch (rule.type) {
                     case 'array': {
                         if (!(v instanceof Array)) {
                             logger.warn('[MgrImpl.doCreateData] err: k('+k+') type(must be:array) invalid.');
@@ -244,8 +395,8 @@ class MgrImpl extends EventEmitter{
                         break;
                     }
                     default: {
-                        if (typeof v != rules[k].type) {
-                            logger.warn('[MgrImpl.doCreateData] err: k('+k+') base type(must be:'+rules[k].type+') invalid.');
+                        if (typeof v != rule.type) {
+                            logger.warn('[MgrImpl.doCreateData] err: k('+k+') base type(must be:'+rule.type+') invalid: %j.', v);
                             return;
                         }
                         break;
@@ -255,83 +406,79 @@ class MgrImpl extends EventEmitter{
                     rdata[k] = v;
                     // if (k !== '_id') {//些处监听，仅能监测到“根结点数据赋值”,需辅以Data.SetChange函数
                     this.__SetChange(k);
-                    // this.__changedRoot[k] = 1; // this=> S_Data
-                    // this.__changedRootExists = true; // this=> S_Data
                     // }
                 }
             });
             // es5,es6没有对数组进行 getter/setter的解决方案
         }
-        // console.log(this.__DataMap[key][id]);
+        // console.log(this.__DataMap.get(key).get(id));
         // 第2种方式，Set,Get函数,先看效率
 
         if (this.IsDebug()) {
             //数据类型检测
-            const srules = this.__RuleMap[key];
-            let rdata = GMgrImpl._mgr.__rDataMap[key][id];
+            const srules = this.__RuleMap.get(key);
             for (let k in data) {
-                if (undefined !== rules[k]) {
+                if (rules.has(k)) {
                     if (!srules.CheckPath(k, data[k])) {
                         logger.warn('[MgrImpl.doCreateData] data check key('+k+') err.');
                         if (isCreated) {
-                            dataInstance[k] = srules.CheckPathAndReset(rules[k], data[k]);
+                            dataInstance[k] = srules.CheckPathAndReset(rules.get(k), data[k]);
                         }
                     } else {
                         if (isCreated) {
                             dataInstance[k] = data[k];
                         } else {//非新创数据，直接初始化，不走Data映射流程
-                            rdata[k] = data[k];
+                            idData[k] = data[k];
                         }
                     }
                 } else {
-                    logger.warn('[MgrImpl.doCreateData] data key('+k+') undefined in rule.');
+                    logger.warn('[MgrImpl.doCreateData] Dev dbcoc[%j] data key(%j) undefined in rule.', key, k);
                 }
             }
         } else {
-            let rdata = GMgrImpl._mgr.__rDataMap[key][id];
             for (let k in data) {
-                if (undefined !== rules[k]) {
+                if (rules.has(k)) {
                     if (isCreated) {
                         dataInstance[k] = data[k];
                     } else {//非新创数据，直接初始化，不走Data映射流程
-                        rdata[k] = data[k];
+                        idData[k] = data[k];
                     }
                 } else {
-                    logger.warn('[MgrImpl.doCreateData] data key('+k+') undefined in rule.');
+                    logger.warn('[MgrImpl.doCreateData] Pro dbcoc[%j] data key(%j) undefined in rule.', key, k);
                 }
             }
         }
 
-        let defaults = this.__RuleMap[key].GetDefaults();
+        let defaults = this.__RuleMap.get(key).GetDefaults();
         if (defaults) {
-            for (let k in defaults) {
+            for (let [k, v] of defaults) {
                 if (undefined === data[k]) {
-                    logger.trace('[MgrImpl.doCreateData] setDefault for:' + k + ', '+ defaults[k]);
-                    dataInstance[k] = defaults[k];
+                    logger.trace('[MgrImpl.doCreateData] setDefault for:' + k + ', '+ v);
+                    dataInstance[k] = v;
                 }
             }
         }
-        let defaultsFunc = this.__RuleMap[key].GetDefaultsFunc();
+        let defaultsFunc = this.__RuleMap.get(key).GetDefaultsFunc();
         // logger.trace('[MgrImpl.doCreateData] defaultsFunc:', defaultsFunc);
         if (defaultsFunc) {
-            for (let k in defaultsFunc) {
+            for (let [k, v] of defaultsFunc) {
                 if (undefined === data[k]) {
                     logger.trace('[MgrImpl.doCreateData] setDefaultFunc for:' + k);
-                    if (defaultsFunc[k] === Date) {
-                        dataInstance[k] = new defaultsFunc[k]();
+                    if (v === Date) {
+                        dataInstance[k] = new v();
                     } else {
-                        dataInstance[k] = defaultsFunc[k]();
+                        dataInstance[k] = v();
                     }
                 }
             }
         }
         // dataInstance.__isCreated = true;
-        // console.log(this.__rDataMap[key][id], data);
+        // console.log(this.__rDataMap.get(key).get(id), data);
         return dataInstance;
     }
     //DbCoc真实数据封装接口
     AddData([dbName, cocName], data) {
-        logger.trace('[MgrImpl.AddData] begin.');
+        logger.trace('[MgrImpl.AddData] begin. cocName:', cocName);
         return this.doCreateData([dbName, cocName], data);
     }
     AddDatas([dbName, cocName], datas) {
@@ -351,8 +498,8 @@ class MgrImpl extends EventEmitter{
             }
         }
         if (undefined !== methods) {
-            for (let k in methods) {
-                SubData.prototype[k] = methods[k];
+            for (let [k, v] of methods) {
+                SubData.prototype[k] = v;
             }
         }
         return SubData;
@@ -362,16 +509,15 @@ class MgrImpl extends EventEmitter{
     //在debug下，开启子类型检测
     // release下，关闭
     IsDebug() {
-        return this._opts.IsDebug;
+        return this.__opts.IsDebug;
     }
     GetDefaultDbName() {
         return this.__defaultDbName;
     }
     _parseArgs(opts) {
-        this._opts = {};
         this._parseArgsDb(opts.db);
-        this._opts.env = opts.env || 'development';
-        this._opts.IsDebug = this._opts.env === 'development';
+        this.__opts.env = opts.env || 'development';
+        this.__opts.IsDebug = this.__opts.env === 'development';
         if (opts.logger) {
             this.logger = opts.logger;
             logger = this.logger;
@@ -385,13 +531,13 @@ class MgrImpl extends EventEmitter{
         if (undefined === opts) {
             throw new Error('[MgrImpl.parseArgs] err: db opts empty.');
         }
-        const MeOpts = this._opts.db = {};
+        const MeOpts = this.__opts.db = {};
 
         if (undefined === opts.databases ||
             !Array.isArray(opts.databases) ||
             opts.databases.length === 0
         ) {
-            throw new Error('[MgrImpl.parseArgs] err: databasees.');
+            throw new Error('[MgrImpl.parseArgs] err: databases.');
         }
 
         MeOpts.host = (undefined === opts.host) ? '127.0.0.1': opts.host;
@@ -417,38 +563,43 @@ class MgrImpl extends EventEmitter{
         if (opts.auth) {
             authUser = opts.user + ':' + opts.password + '@';
         }
-        this._opts._connStr = 'mongodb://' + authUser + opts.host + ':' + opts.port + '/';
-        this._opts._connOpts = {
+        this.__opts._connStr = 'mongodb://' + authUser + opts.host + ':' + opts.port + '/';
+        this.__opts._connOpts = {
             useNewUrlParser: true
         };
 
         if (opts.auth) {
+            // if (undefined !== opts.hosts) { // 127.0.0.1:27017,127.0.0.1:27018,127.0.0.1:27019
+            //     this.__opts._connStr = 'mongodb://' + authUser + opts.hosts + '/';
+            //     this.__opts._connOpts.mongos = opts.mongos || true;//默认为分片副本集
+            // }
+
             if (opts.authMechanism) {
-                this._opts._connOpts.authMechanism = opts.authMechanism;//'MONGODB-CR';
+                this.__opts._connOpts.authMechanism = opts.authMechanism;//'MONGODB-CR';
             }
             if (opts.authSource) {
-                this._opts._connOpts.authSource = opts.authSource;
+                this.__opts._connOpts.authSource = opts.authSource;
             }
         }
 
         return true;
     }
     _init() {
-        this._opts.db.databases.forEach(dbName => {
-            if (undefined !== this.__DbMap[dbName]) {
+        this.__opts.db.databases.forEach(dbName => {
+            if (undefined !== this.__DbMap.get(dbName)) {
                 return;
             }
             if (undefined === this.__defaultDbName) {
                 this.__defaultDbName = dbName;
             }
-            this.__DbMap[dbName] = S_Db(dbName, this);//this指向MgrImpl, initDb
+            this.__DbMap.set(dbName, S_Db(dbName, this));//this指向MgrImpl, initDb
         });
         this._startTick();
     }
     // 定时器
     _startTick() {
         logger.trace('_startTick: begin');
-        if (undefined !== this.__tickT) {
+        if (this.__tickT) {
             return;
         }
         this.__tickT = setInterval(() => {
@@ -461,16 +612,16 @@ class MgrImpl extends EventEmitter{
     _tick() {
         let now = Date.now();
         let saveLimit = G_SaveLimit;
-        for (let key in this.__DbCocMap) {
-            this._state(now);
-            if (this.__status != MgrImpl_stage.Running) {
-                logger.trace('[MgrImpl._tick] wait running.');
-                return;
-            }
-            // console.log(key, this.__DbCocMap[key]);
-            this.__DbCocMap[key].Tick(now);
+        this._state(now);
+        if (this.__status != MgrImpl_stage.Running) {
+            logger.trace('[MgrImpl._tick] wait running.');
+            return;
+        }
+        for (let [, coc] of this.__DbCocMap) {
+            // console.log(key, coc);
+            coc.Tick(now);
             if (saveLimit > 0) {
-                saveLimit -= this.__DbCocMap[key].TickSaveMsg(now, saveLimit);
+                saveLimit -= coc.TickSaveMsg(now, saveLimit);
             }
         }
     }
@@ -480,14 +631,14 @@ class MgrImpl extends EventEmitter{
         }
         this.__nextStatePrint = now + 10000;
         logger.info('[MgrImpl._state] __status:'+this.__status+
-            ', __DbMap:'+Object.keys(this.__DbMap).length+
-            ',__DbCocMap:'+Object.keys(this.__DbCocMap).length+
-            ',__rDataMap:'+Object.keys(this.__rDataMap).length+
-            ',__DataMap:'+Object.keys(this.__DataMap).length+
-            ',__RuleMap:'+Object.keys(this.__RuleMap).length+
-            ',__SDataMap:'+Object.keys(this.__SDataMap).length);
-        for (let k in this.__rDataMap) {
-            logger.info('[MgrImpl._state] __rDataMap k('+k+'): '+ Object.keys(this.__rDataMap[k]).length);
+            ', __DbMap:'+this.__DbMap.size+
+            ',__DbCocMap:'+this.__DbCocMap.size+
+            ',__rDataMap:'+this.__rDataMap.size+
+            ',__DataMap:'+this.__DataMap.size+
+            ',__RuleMap:'+this.__RuleMap.size+
+            ',__SDataMap:'+this.__SDataMap.size);
+        for (let [k, rdatas] of this.__rDataMap) {
+            logger.info('[MgrImpl._state] __rDataMap k('+k+'): '+ rdatas.size);
         }
     }
 
@@ -508,14 +659,24 @@ class MgrImpl extends EventEmitter{
         MgrImpl._mgr.on('reconnect', MgrImpl._onEvent('reconnect'));
         MgrImpl._mgr.on('reconnectFailed', MgrImpl._onEvent('reconnectFailed'));
     }
+
+    onConnect() { // 处理连接成功的事务
+        //this.initDbCocMap();
+        this._initIndex();
+    }
+
     static _onEvent(eventStr, err) {
-        return (/*err, db*/) => {
+        return (err, db) => {
             if (MgrImpl._mgr.IsStopped()) {
                 return;
             }
             switch (eventStr) {
             case 'connect': {
-                MgrImpl._mgr.__status = MgrImpl_stage.Running;
+                MgrImpl._mgr.__DbConnected.add(db);
+                if (MgrImpl._mgr.__DbConnected.size === MgrImpl._mgr.__DbMap.size) {
+                    MgrImpl._mgr.__status = MgrImpl_stage.Running;
+                    MgrImpl._mgr.onConnect();
+                }
                 break;
             }
             case 'error': {
@@ -548,7 +709,7 @@ class MgrImpl extends EventEmitter{
                 break;
             }
             }
-            logger.trace('[MgrImpl._onEvent] eventStr:%j', MgrImpl._mgr._status, eventStr);
+            logger.trace('[MgrImpl._onEvent] eventStr:%j', MgrImpl._mgr.__status, eventStr);
             // this.emit(err);
             // logger.trace(err);
         };

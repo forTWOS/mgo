@@ -59,6 +59,6 @@ const RuleOpts = {
 };
 
 
-const r = S_Rule(RuleOpts);
+const r = S_Rule('coc', RuleOpts);
 // console.dir(r);
 console.dir(r._rules.oArray.typeExt.typeExt.subObj);

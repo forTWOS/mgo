@@ -23,9 +23,9 @@ const pro = module.exports = {};
 //     }
 //     return _Mgr;
 // };
-const Instance = pro.Instance = () => {
+const Instance = pro.Instance = (...args) => {
     if (undefined === _Mgr) {
-        _Mgr = MgrImpl();
+        _Mgr = MgrImpl(...args);
         _Isinited = true;
     }
     return _Mgr;

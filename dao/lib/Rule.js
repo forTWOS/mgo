@@ -70,7 +70,7 @@ const RuleDataType = [
 //     {},// Object,
 // ];
 
-const RuleDeepLimit = 5;
+const RuleDeepLimit = 7;
 
 // 说明:
 // 规则检测，是初始操作，深入遍历检测
@@ -85,20 +85,23 @@ const RuleDeepLimit = 5;
 //    在Data层，定义根结点getter/setter
 // 使用时机
 class Rule {
-    constructor(opts) {
-        this._rules = {};// {keyname: {type: xx, default: xx}}
-        this._indexes = {};
+    constructor(dbName, opts) {
+        this._dbName = dbName;
+        this._rules = new Map();// {keyname: {type: xx, default: xx}}
+        this._indexes = new Map();
 
         // default value
-        this._defaults = {};//有显式设定的default,_id自动ObjectId
-        this._defaultsExists = false;
-        this._defaultsFunc = {};//默认值是函数的
-        this._defaultsFuncExists = false;
-        this._methods = {};
+        this._defaults = new Map();//有显式设定的default,_id自动ObjectId
+        this._defaultsFunc = new Map();//默认值是函数的
+        this._methods = new Map();
+        this._gMethods = new Map();
 
         this.parseOpts(opts);
     }
 
+    GetDbName() {
+        return this._dbName;
+    }
     GetRules() {
         return this._rules;
     }
@@ -106,22 +109,19 @@ class Rule {
         return this._indexes;
     }
     GetDefaults() {
-        if (!this._defaultsExists) {
-            return undefined;
-        }
-        return this._defaults;
+        return this._defaults.size > 0 ? this._defaults : null;
     }
     GetDefaultsFunc() {
-        if (!this._defaultsFuncExists) {
-            return undefined;
-        }
-        return this._defaultsFunc;
+        return this._defaultsFunc.size > 0 ? this._defaultsFunc : null;
     }
     GetTableName() {
         return this._tableName;
     }
     GetMethods() {
         return this._methods;
+    }
+    GetGMethods() {
+        return this._gMethods;
     }
 
     // Check头函数，仅做检查，不可依赖其内其它功能(生产环境，关闭Check)
@@ -192,10 +192,10 @@ class Rule {
     }
     CheckPath(path, data) {//path是根结点,该结点数据
         util.GetLogger().trace('[Rule.CheckPath] begin:'+path, typeof data);
-        if (undefined === this._rules[path] && undefined !== data) {
+        if (!this._rules.has(path) && undefined !== data) {
             return false;
         }
-        let rule = this._rules[path];
+        let rule = this._rules.get(path);
         util.GetLogger().trace('[Rule.CheckPath] rule.type:', rule.type);
         if (rule.type != 'object' && rule.type != 'array') {
             return true;
@@ -267,18 +267,52 @@ class Rule {
             throw new Error('[Rule.parseOpts] err: tableName undefined.');
         }
         if (undefined === opts.data || 'object' !== typeof opts.data) {
-            throw new Error('[Rule.parseOpts] err: data undefined.');
+            throw new Error('[Rule.parseOpts] err: data undefined, tableName:'+opts.tableName);
         }
 
         let data = opts.data;
         if (undefined === data._id) {
-            throw new Error('[Rule.parseOpts] err: data._id undefined.');
+            throw new Error('[Rule.parseOpts] err: data._id undefined, tableName:'+opts.tableName);
         }
-
+        //复合索引检测;    配置 opts.indexes:  {tableName: 'abc', data: {},  indexes: { _index_keyid_uid_: ['keyid', 'uid'] } }
+        let indexes = opts.indexes;
+        if (undefined !== indexes) {
+            for (let k in indexes) {
+                let indexesArray = indexes[k];
+                if (!Array.isArray(indexesArray)) {
+                    throw new Error('[Rule.parseOpts] err1: indexes[' + k + '] is not array, tableName:' + opts.tableName);
+                }
+                if (indexesArray.length < 2) {
+                    throw new Error('[Rule.parseOpts] err1: indexes[' + k + '] can be defined in data, tableName:' + opts.tableName);
+                }
+                let indexName = 'composite_';
+                for (let i = 0; i < indexesArray.length; ++i) {
+                    if (!data[indexesArray[i]]) {
+                        throw new Error('[Rule.parseOpts] err1: indexes[' + k + '].' + indexesArray[i] + ' is undefined in data, tableName:' + opts.tableName);
+                    }
+                    indexName += '_'+indexesArray[i];
+                }
+                Number(indexName);
+                this._indexes.set(indexName, indexesArray);
+            }
+        }
         // 类型检测
         this._parseOpts_typeCheck(data);
         if (undefined !== opts.methods) {
-            this._methods = opts.methods;
+            for (let k in opts.methods) {
+                if (typeof(opts.methods[k]) !== 'function') {
+                    throw new Error('[Rule.parseOpts] err: methods not function, tableName:'+opts.tableName);
+                }
+                this._methods.set(k, opts.methods[k]);
+            }
+        }
+        if (!!opts.gMethods) {
+            for (let k in opts.gMethods) {
+                if (typeof(opts.gMethods[k]) !== 'function') {
+                    throw new Error('[Rule.parseOpts] err: gMethods not function, tableName:'+opts.tableName);
+                }
+                this._gMethods.set(k, opts.gMethods[k]);
+            }
         }
     }
 
@@ -322,7 +356,7 @@ class Rule {
                 res2.type = 'array';
                 res2.default = [];
                 // console.dir(res2);
-                this._rules[k] = res2; // 有可能object
+                this._rules.set(k, res2); // 有可能object
                 continue;
             }
 
@@ -339,32 +373,32 @@ class Rule {
                 if (Object.keys(tmpDataType).length === 0) {
                     throw new Error('[Rule.parseOpts] err: data('+k+') type isObject && empty.');
                 }
-                this._rules[k] = {
+                this._rules.set(k, {
                     type: 'object',
                     typeExt: {},
                     default: {}
-                };
+                });
                 // 检测子项
                 for (let k2 in tmpDataType) {
                     if (undefined === tmpDataType[k2].type) {
                         throw new Error('[Rule.parseOpts] err: data('+k+'.'+k2+') type isObject && type undefined.');
                     }
-                    this._rules[k]['typeExt'][k2] = this._parseOpts_typeCheckDo(k+'.'+k2, tmpDataType[k2].type, tmpData[k2], 2);// 有可能object,array
-                    // console.log(k, k2, this._rules[k][k2]);
+                    this._rules.get(k)['typeExt'][k2] = this._parseOpts_typeCheckDo(k+'.'+k2, tmpDataType[k2].type, tmpData[k2], 2);// 有可能object,array
+                    // console.log(k, k2, this._rules.get(k)[k2]);
                 }
                 continue;
             }
             //--> tmpData.type类型检测
-            this._rules[k] = this._parseOpts_typeCheckDo(k, tmpDataType, tmpData);
+            this._rules.set(k, this._parseOpts_typeCheckDo(k, tmpDataType, tmpData));
 
             //索引:
             // 仅支持简单类型
             // 仅根结点
             // 不做object,array的索引
-            if ('_id' === k) {
-                this._indexes[k] = {index: 'unique'};
+            if ('_id' === k) { //不处理_id索引，mongodb会自动创建
+                //this._indexes.set(k, {unique: true});
             } else {
-                this._indexes[k] = Rule._parseOpts_IndexCheckAndGet(k, tmpData);
+                this._indexes.set(k+'_', Rule._parseOpts_IndexCheckAndGet(k, tmpData));
             }
         }
     }
@@ -424,7 +458,7 @@ class Rule {
             res2.type = 'array';
             res2.default = [];
             // console.dir(res2);
-            // this._rules[k] = res2; // 有可能object
+            // this._rules.set(k, res2); // 有可能object
             return res2;
         }
 
@@ -464,11 +498,9 @@ class Rule {
         // _id自动默认值
         if ('_id' == k || (1 === deep && undefined !== data.default)) {
             if (defaultVal instanceof Function) {
-                this._defaultsFunc[k] = defaultVal;
-                this._defaultsFuncExists = true;
+                this._defaultsFunc.set(k, defaultVal);
             } else {
-                this._defaults[k] = defaultVal;
-                this._defaultsExists = true;
+                this._defaults.set(k, defaultVal);
             }
         }
         return {

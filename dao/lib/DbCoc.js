@@ -28,8 +28,7 @@ class DbCoc {
         this._coc = undefined;
 
         //msg
-        this.__saveMsgCount = 0;//计数
-        this.__saveMsgMap = {};//保存消息队列
+        this.__saveMsgMap = new Set();//保存消息队列
         this.__saveMsgMap_ing = false;//进行中标志
 
         //debug
@@ -40,7 +39,7 @@ class DbCoc {
             return;
         }
         this.__statePrintTime = now;
-        util.GetLogger().info('[DbCoc.State] __key:' + this.__key + ', __saveMsgCount:' + this.__saveMsgCount + ', __saveMsgMap:' + Object.keys(this.__saveMsgMap).length);
+        util.GetLogger().info('[DbCoc.State] __key:' + this.__key + ', __saveMsgMap:' + this.__saveMsgMap.size);
     }
 
     // 100ms/次
@@ -105,7 +104,7 @@ class DbCoc {
     // 保存给定的值
     Save(id, sets, cb) {
         util.GetLogger().trace('[DbCoc.Save] begin');
-        this.Update({_id: id}, {'$set': sets}, cb);
+        this.UpdateOne({_id: id}, {'$set': sets}, cb);
     }
     // 强制保存id下的data全值
     // 无则创建
@@ -117,7 +116,7 @@ class DbCoc {
             cb(errStr);
             return;
         }
-        this.Update({_id: data._id}, data, {upsert: true}, cb);
+        this.UpdateOne({_id: data._id}, data, {upsert: true}, cb);
     }
     doCreate(id, cb) {
         util.GetLogger().trace('[DbCoc.doCreate] begin.');
@@ -154,13 +153,15 @@ class DbCoc {
     // saveLimit当次可用处理条数
     // 返回当次处理条数
     TickSaveMsg(now, saveLimit) {
-        if (this.__saveMsgCount <= 0 || this.__saveMsgMap_ing) {
+        if (this.__saveMsgMap.size == 0 || this.__saveMsgMap_ing) {
             return 0;
         }
         this.__saveMsgMap_ing = true;
         let ids = [];
-        for (let k in this.__saveMsgMap) {
+        for (let k of this.__saveMsgMap) {
             ids.push(k);
+
+            this.__saveMsgMap.delete(k);
             if (/*ids.length >= DbCoc_saveLimit ||*/ --saveLimit <= 0) {
                 break;
             }
@@ -174,9 +175,6 @@ class DbCoc {
         let cn = ids.length;
         for (let i = 0; i < ids.length; ++i) {
             let id = ids[i];
-            this.__saveMsgMap[id] = undefined;
-            delete this.__saveMsgMap[id];
-            --this.__saveMsgCount;
 
             // 找到Data，并调用其__DoSave(异步)
             let sdata = GMgrImpl._mgr.GetData(this.__key, id);
@@ -185,7 +183,7 @@ class DbCoc {
                 if (errCode || sdata.__IsChanged() || sdata.__IsCreated()) {
                     sdata.__Save(); // 重走保存流程
                 } else if (sdata.__IsStop()) {//清理流程 有Data.isStop标志
-                    util.GetLogger().info('[DbCoc.__DoSave] clear Data:', id);// 重要处理，打印一下
+                    util.GetLogger().info('[DbCoc.__DoSave] clear Data:%j', id);// 重要处理，打印一下
                     GMgrImpl._mgr.RemoveData(this.__key, id);
                 }
                 if (--cn == 0) {
@@ -193,17 +191,14 @@ class DbCoc {
                 }
             });
         }
-        util.GetLogger().trace('[DbCoc.TickSaveMsg] ids:' + ids.length + ', this.__saveMsgCount:'+ this.__saveMsgCount);
+        util.GetLogger().trace('[DbCoc.TickSaveMsg] ids:' + ids.length + ', this.__saveMsgCount:'+ this.__saveMsgMap.size);
         return ids.length;
     }
     HadSaveMsg(id) {
-        return !!this.__saveMsgMap[id];
+        return this.__saveMsgMap.has(id);
     }
     AddSaveMsg(id) {
-        if (!this.__saveMsgMap[id]) {
-            this.__saveMsgMap[id] = 1;
-            ++this.__saveMsgCount;
-        }
+        this.__saveMsgMap.add(id);
     }
 
     // 给mongodb库的返回值，做Data封装
@@ -314,7 +309,7 @@ class DbCoc {
 
         opts.timeout = 5000;//5秒超时
         opts.limit = 1;
-        opts.fields = filter;//mongodb3.1.1
+        opts.projection = filter;//mongodb3.1.10
 
         // util.GetLogger().debug(find, opts);
         coc.find(find, opts).next(cb);
@@ -401,10 +396,10 @@ class DbCoc {
         }
 
         opts.timeout = 5000;//5秒超时
-        opts.fields = filter;//mongodb3.1.1
+        opts.projection = filter;//mongodb3.1.10
 
         /*
-         var testForFields = {
+         let testForFields = {
             limit: 1, sort: 1, fields:1, skip: 1, hint: 1, explain: 1, snapshot: 1, timeout: 1, tailable: 1, tailableRetryInterval: 1
           , numberOfRetries: 1, awaitdata: 1, awaitData: 1, exhaust: 1, batchSize: 1, returnKey: 1, maxScan: 1, min: 1, max: 1, showDiskLoc: 1
           , comment: 1, raw: 1, readPreference: 1, partial: 1, read: 1, dbName: 1, oplogReplay: 1, connection: 1, maxTimeMS: 1, transforms: 1
@@ -414,6 +409,33 @@ class DbCoc {
         * */
         coc.find(find, opts).toArray(cb);
     }
+
+    Count(find, opts, cb) {
+        if (undefined === cb) {
+            cb = opts;
+            opts = {};
+
+            if (undefined === cb || typeof cb !== 'function') {
+                util.GetLogger().warn('[DbCoc.FindOriginal] err: params invalid');
+                throw new Error('[DbCoc.FindOriginal] err: params invalid');
+            }
+        }
+
+        let coc = this.getCoc();
+        if (!coc) {
+            cb(ErrCode.DbCoc.CocNotExists);
+            return;
+        }
+        opts.timeout = 5000;//5秒超时
+
+        coc.find(find, opts).count((err, count) => {
+            if (err) {
+                cb(err);
+            } else {
+                cb(null, count);
+            }
+        });
+    };
 
     ////////////////////////////////////
     // update
@@ -441,7 +463,7 @@ class DbCoc {
             return;
         }
 
-        coc.update(find, set, opts, (err, res) => {
+        coc.updateMany(find, set, opts, (err, res) => {
             // res: {
             // result: { n: 1, nModified: 1, ok: 1 },
             // modifiedCount: 1,
@@ -449,12 +471,14 @@ class DbCoc {
             // upsertedCount: 0,
             // matchedCount: 1 }
             if (err) {
-                util.GetLogger().error('update err:' + err.toString());
+                util.GetLogger().error('[DbCoc.Update] err:' + err.toString());
                 cb(err);
                 return;
             }
-            if (!res.result.ok || (res.matchedCount != 1 && res.nModified != 1 && res.upsertedCount != 1)) {
-                util.GetLogger().warn('update err:' + res+', res.matchedCount:'+res.matchedCount+',res.upsertedCount:'+res.upsertedCount);
+            if (!res || !res.result.ok ||
+                (res.result.matchedCount == 0 && res.result.upsertedCount == 0) ||
+                (res.result.nModified == 0 && res.result.n == 0)) {
+                util.GetLogger().warn('[DbCoc.Update] err, res:%j', res);
                 cb(ErrCode.DbCoc.DbProcessErr);
                 return;
             }
@@ -494,12 +518,14 @@ class DbCoc {
             // upsertedCount: 0,
             // matchedCount: 1 }
             if (err) {
-                util.GetLogger().error('update err:' + err.toString());
+                util.GetLogger().error('[DbCoc.UpdateOne] err:' + err.toString());
                 cb(err);
                 return;
             }
-            if (!res.result.ok || (res.matchedCount != 1 && res.nModified != 1 && res.upsertedCount != 1)) {
-                util.GetLogger().warn('update err:' + res+', res.matchedCount:'+res.matchedCount+',res.upsertedCount:'+res.upsertedCount);
+            if (!res || !res.result.ok ||
+                (res.result.matchedCount == 0 && res.result.upsertedCount == 0) ||
+                (res.result.nModified == 0 && res.result.n == 0)) {
+                util.GetLogger().warn('[DbCoc.UpdateOne] err, res:%j', res);
                 cb(ErrCode.DbCoc.DbProcessErr);
                 return;
             }
@@ -508,10 +534,59 @@ class DbCoc {
         });
     }
     ////////////////////////////////////
-    // // remove 暂无此操作，不实现了
-    // Remove(find, cb) {
-    //
-    // }
+    Remove(find, cb) {
+        if (undefined === find) {
+            util.GetLogger().warn('[DbCoc.Remove] err: params invalid.');
+            cb(ErrCode.ParamsErr);
+            return;
+        }
+        if (undefined === cb) {
+            util.GetLogger().warn('[DbCoc.Remove] err: cb invalid.');
+            return;
+        }
+
+        let coc = this.getCoc();
+        if (!coc) {
+            cb(ErrCode.DbCoc.CocNotExists);
+            return;
+        }
+
+        coc.deleteMany(find, (err, res) => {
+            if (err) {
+                util.GetLogger().error('[DbCoc.Remove] err:' + err.toString());
+                cb(err);
+                return;
+            }
+            if (!res.result.ok) {
+                util.GetLogger().warn('[DbCoc.Remove] err:' + res+', res.matchedCount:'+res.matchedCount+',res.upsertedCount:'+res.upsertedCount);
+                cb(ErrCode.DbCoc.DbProcessErr);
+                return;
+            }
+            // util.GetLogger().trace(res);
+            cb(null);
+        });
+    }
+    Drop(cb) {
+        if (undefined === cb) {
+            util.GetLogger().warn('[DbCoc.Drop] err: cb invalid.');
+            return;
+        }
+
+        let coc = this.getCoc();
+        if (!coc) {
+            cb(ErrCode.DbCoc.CocNotExists);
+            return;
+        }
+
+        coc.drop((err) => {
+            if (err) {
+                util.GetLogger().error('[DbCoc.Drop] err:' + err.toString());
+                cb(err);
+                return;
+            }
+            cb(null);
+        });
+    }
 }
 
 module.exports = (...args) => {
