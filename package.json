@@ -1,6 +1,28 @@
 {
+  "name": "mgo",
+  "version": "1.0.0",
+  "description": "mongodb",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/forTWOS/mgo.git"
+  },
+  "keywords": [
+    "mongodb",
+    "small",
+    "quickly"
+  ],
   "dependencies": {
     "generic-pool": "^3.4.2",
-    "mongodb": "^3.1.1"
-  }
+    "mongodb": "^6.17.0"
+  },
+  "author": "forTWOS",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/forTWOS/mgo/issues"
+  },
+  "homepage": "https://github.com/forTWOS/mgo#readme"
 }
