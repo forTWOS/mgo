@@ -1,4 +1,4 @@
-
+## setter/getter data without function call
 # 结构示意图：
 //////////////////////////////////////////////////////////////
 - Mgr-MgrImpl:
@@ -6,15 +6,15 @@
         -Uninited
         -Inited
         -Start
-        -Error:事件类
+        -Error
         -Stop
     - Event:事件类
-        -db连接
-            -close
-            -reconnect
-            -reconnectFail
-            -parsed error
-        -类型检测
+        - db连接
+            - close
+            - reconnect
+            - reconnectFail
+		- parsed error
+			- 类型检测
     - DbMap(Db from DbFactory):连接抽象类管理
     - DbCocMap(Coc from Db.Coc):表缓存
     - rDataMap(real data map):真实数据map{dbname/cocname:{_id:data}}
