@@ -16,8 +16,8 @@ const dbOpts = {
     "host" : "127.0.0.1",
     "port" : "27017",
     "databases" : ["thcoc"], // 初始化多个数据库连接
-    "user" : "xusf",
-    "password" : "shunfanv5",
+    "user" : "",
+    "password" : "",
     "authSource": "admin",
     "authMechanism": "SCRAM-SHA-1"
 };
