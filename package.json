@@ -1,7 +1,7 @@
 {
-  "name": "mgo",
+  "name": "mongo2",
   "version": "1.0.0",
-  "description": "mongodb",
+  "description": "thin wrap for mongodb",
   "main": "index.js",
   "scripts": {
     "test": "node scripts/test.js"
